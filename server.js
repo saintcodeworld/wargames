@@ -138,7 +138,10 @@ app.post('/api/admin/add-balance', async (req, res) => {
   }
 });
 
-// Only serve static files when not on Render (Vercel handles frontend)
+// Always serve socket.io client library (Vercel frontend needs to load it from Render)
+app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist')));
+
+// Serve other static files only when not on Render (Vercel handles the frontend)
 if (!process.env.RENDER) {
   app.use(express.static(path.join(__dirname, 'public')));
 }
