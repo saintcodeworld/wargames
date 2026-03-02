@@ -29,18 +29,26 @@
       </div>
       <div id="auth-error" class="auth-error"></div>
     </div>
+    <button id="how-it-works-btn-auth" class="how-it-works-btn">HOW IT WORKS</button>
   </div>
 
   <!-- Lobby -->
   <div id="lobby" style="display:none;">
     <div class="lobby-title">USA vs IRAN</div>
-    <div class="lobby-subtitle">THE TRENCHES</div>
+    <div class="lobby-subtitle">THE WAR GAMES</div>
 
     <div class="lobby-top-bar">
       <div class="lobby-user-info">
         <span id="lobby-username" class="lobby-username"></span>
+        <div class="balance-display">
+          <span class="balance-icon">◎</span>
+          <span id="lobby-balance" class="balance-amount">0.00</span>
+          <span class="balance-label">SOL</span>
+          <button id="deposit-btn" class="deposit-btn">+ DEPOSIT</button>
+        </div>
       </div>
       <div class="lobby-top-actions">
+        <button id="how-it-works-btn-lobby" class="action-btn account-btn-style">HOW IT WORKS</button>
         <button id="account-btn" class="action-btn account-btn-style">ACCOUNT</button>
       </div>
     </div>
@@ -57,6 +65,31 @@
           <div class="mode-desc">SQUAD ASSAULT</div>
           <div class="mode-players">4 PLAYERS</div>
         </div>
+      </div>
+
+      <!-- Entry Fee Selection (shown after mode select) -->
+      <div id="entry-fee-section" class="entry-fee-section" style="display:none;">
+        <div class="entry-fee-title">SELECT ENTRY FEE</div>
+        <div class="entry-fee-options">
+          <div class="fee-option" data-fee="0.01">
+            <div class="fee-amount">0.01</div>
+            <div class="fee-label">SOL</div>
+          </div>
+          <div class="fee-option" data-fee="0.05">
+            <div class="fee-amount">0.05</div>
+            <div class="fee-label">SOL</div>
+          </div>
+          <div class="fee-option" data-fee="0.1">
+            <div class="fee-amount">0.1</div>
+            <div class="fee-label">SOL</div>
+          </div>
+          <div class="fee-option" data-fee="0.5">
+            <div class="fee-amount">0.5</div>
+            <div class="fee-label">SOL</div>
+          </div>
+        </div>
+        <div id="fee-error" class="fee-error"></div>
+        <button id="create-room-btn" class="action-btn create-room-btn" disabled>CREATE ROOM</button>
       </div>
 
       <div class="lobby-actions">
@@ -109,6 +142,10 @@
         <div class="stat-item"><span class="stat-label">LOSSES</span><span class="stat-value" id="account-losses">0</span></div>
         <div class="stat-item"><span class="stat-label">KILLS</span><span class="stat-value" id="account-kills">0</span></div>
         <div class="stat-item"><span class="stat-label">DEATHS</span><span class="stat-value" id="account-deaths">0</span></div>
+      </div>
+      <div class="stat-item stat-balance">
+        <span class="stat-label">BALANCE</span>
+        <span class="stat-value" id="account-balance">0.00 SOL</span>
       </div>
       <div class="account-popup-actions">
         <button id="logout-btn" class="action-btn logout-btn">LOGOUT</button>
@@ -165,6 +202,53 @@
   <!-- Room Info -->
   <div id="room-info">ROOM: <span id="room-id-display"></span></div>
 
+  <!-- Prize Pool HUD (shown during game) -->
+  <div id="prize-pool-hud" style="display:none;">
+    <span class="prize-icon">◎</span>
+    <span id="prize-pool-amount">0.00</span>
+    <span class="prize-label">SOL PRIZE POOL</span>
+  </div>
+
+  <!-- Deposit Modal -->
+  <div id="deposit-modal" class="account-popup" style="display:none;">
+    <div class="account-popup-content deposit-modal-content">
+      <div class="account-popup-title">DEPOSIT SOL</div>
+      <div class="deposit-info">Select the amount you want to deposit, then send the exact amount to the wallet address shown below.</div>
+
+      <!-- Step 1: Amount Selection -->
+      <div id="deposit-step-amounts" class="deposit-amounts">
+        <button class="deposit-amount-btn" data-amount="0.1">0.1 SOL</button>
+        <button class="deposit-amount-btn" data-amount="0.5">0.5 SOL</button>
+        <button class="deposit-amount-btn" data-amount="1">1 SOL</button>
+        <button class="deposit-amount-btn" data-amount="5">5 SOL</button>
+      </div>
+
+      <!-- Step 2: Wallet Address + Instructions (hidden until amount selected) -->
+      <div id="deposit-step-address" class="deposit-address-section" style="display:none;">
+        <div class="deposit-selected-amount">SEND EXACTLY <span id="deposit-exact-amount" class="deposit-highlight">0.00</span> SOL</div>
+        <div class="deposit-address-label">TO THIS WALLET ADDRESS:</div>
+        <div class="deposit-address-box">
+          <span id="deposit-wallet-address" class="deposit-wallet-text">Loading...</span>
+          <button id="copy-wallet-btn" class="copy-btn" title="Copy address">COPY</button>
+        </div>
+        <div class="deposit-instructions">
+          <div class="deposit-instruction-item">1. Copy the wallet address above</div>
+          <div class="deposit-instruction-item">2. Open your Solana wallet (Phantom, Solflare, etc.)</div>
+          <div class="deposit-instruction-item">3. Send exactly <span class="deposit-highlight deposit-exact-repeat">0.00</span> SOL to the address</div>
+          <div class="deposit-instruction-item">4. Click "I'VE SENT IT" after your transaction confirms</div>
+        </div>
+        <button id="deposit-verify-btn" class="action-btn verify-btn">I'VE SENT IT</button>
+        <div id="deposit-verify-status" class="deposit-status"></div>
+        <button id="deposit-back-btn" class="action-btn back-btn">← BACK</button>
+      </div>
+
+      <div id="deposit-status" class="deposit-status"></div>
+      <div class="account-popup-actions">
+        <button id="deposit-close-btn" class="action-btn">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Controls Info -->
   <div id="controls-info">
     <div class="controls-title">CONTROLS</div>
@@ -181,6 +265,57 @@
     <div class="chat-input-container">
       <input type="text" id="chat-input" placeholder="Type message..." maxlength="200">
       <button id="chat-send">SEND</button>
+    </div>
+  </div>
+
+  <!-- How It Works Popup -->
+  <div id="how-it-works-popup" class="account-popup" style="display:none;">
+    <div class="account-popup-content how-it-works-content">
+      <div class="account-popup-title">HOW IT WORKS</div>
+      <div class="hiw-sections">
+        <div class="hiw-section">
+          <div class="hiw-section-title">GETTING STARTED</div>
+          <div class="hiw-step">1. Sign up to create a new account. A unique keypair (public key + private key) is generated for you.</div>
+          <div class="hiw-step">2. Save your private key somewhere safe. It is the only way to log back into your account.</div>
+          <div class="hiw-step">3. Deposit SOL to your account balance using the DEPOSIT button in the lobby.</div>
+        </div>
+        <div class="hiw-section">
+          <div class="hiw-section-title">CREATING / JOINING A MATCH</div>
+          <div class="hiw-step">1. Select a game mode: 1v1 (2 players) or 2v2 (4 players).</div>
+          <div class="hiw-step">2. Pick an entry fee (0.01 / 0.05 / 0.1 / 0.5 SOL). The entry fee is deducted from your balance when you join.</div>
+          <div class="hiw-step">3. Click CREATE ROOM, or join an existing room from the ACTIVE BATTLEFIELDS list.</div>
+          <div class="hiw-step">4. Once all player slots are filled, a 3-second countdown starts and the match begins.</div>
+        </div>
+        <div class="hiw-section">
+          <div class="hiw-section-title">GAMEPLAY</div>
+          <div class="hiw-step">W / Up Arrow -- Move up / Jump</div>
+          <div class="hiw-step">S / Down Arrow -- Crouch (in trenches)</div>
+          <div class="hiw-step">A / Left Arrow -- Move left</div>
+          <div class="hiw-step">D / Right Arrow -- Move right</div>
+          <div class="hiw-step">SPACE or F -- Shoot</div>
+          <div class="hiw-step">You are assigned to either USA or IRAN. Eliminate opponents to score kills for your team.</div>
+        </div>
+        <div class="hiw-section">
+          <div class="hiw-section-title">ROUNDS AND WINNING</div>
+          <div class="hiw-step">Matches are best-of-3 rounds. Each round has a kill target.</div>
+          <div class="hiw-step">The first team to reach the kill target wins the round.</div>
+          <div class="hiw-step">Win 2 out of 3 rounds to win the match.</div>
+        </div>
+        <div class="hiw-section">
+          <div class="hiw-section-title">PRIZE POOL AND PAYOUTS</div>
+          <div class="hiw-step">All entry fees are combined into a prize pool (minus a small platform fee).</div>
+          <div class="hiw-step">The winning team splits the prize pool evenly among its members.</div>
+          <div class="hiw-step">Winnings are credited to your in-game balance automatically.</div>
+        </div>
+        <div class="hiw-section">
+          <div class="hiw-section-title">LEADERBOARD</div>
+          <div class="hiw-step">The leaderboard tracks wins, losses, kills, and deaths over the last 24 hours.</div>
+          <div class="hiw-step">The top-ranked player earns a 2 SOL reward.</div>
+        </div>
+      </div>
+      <div class="account-popup-actions">
+        <button id="how-it-works-close-btn" class="action-btn">CLOSE</button>
+      </div>
     </div>
   </div>
 

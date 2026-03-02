@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — The Trenches</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #ff4444;
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 0.85rem;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: #ccc;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #222;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="password"],
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0d0d0d;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 14px;
+    }
+    input:focus {
+      border-color: #ff4444;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:hover { background: #cc3333; }
+    button:active { transform: scale(0.98); }
+    button:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .msg.success {
+      display: block;
+      background: #0d2818;
+      border: 1px solid #1a5c2e;
+      color: #4ade80;
+    }
+    .msg.error {
+      display: block;
+      background: #2a0a0a;
+      border: 1px solid #5c1a1a;
+      color: #f87171;
+    }
+
+    .user-result {
+      background: #0d0d0d;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .user-result:hover {
+      border-color: #ff4444;
+    }
+    .user-result .pk {
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #aaa;
+      word-break: break-all;
+    }
+    .user-result .stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .user-result .stats span {
+      color: #aaa;
+    }
+    .user-result .balance-tag {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 10px;
+      background: #1a2a1a;
+      border-radius: 4px;
+      color: #4ade80;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .hidden { display: none !important; }
+
+    .search-results {
+      margin-top: 14px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .selected-user {
+      background: #1a1a2a;
+      border: 1px solid #4444ff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      word-break: break-all;
+      color: #88aaff;
+    }
+    .selected-user .label {
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 0.75rem;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .logout-btn {
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      font-size: 0.8rem;
+      padding: 8px;
+      margin-top: 10px;
+    }
+    .logout-btn:hover {
+      border-color: #ff4444;
+      color: #ff4444;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚙ ADMIN PANEL</h1>
+    <p class="subtitle">The Trenches — Balance Management</p>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="card">
+      <h2>🔒 Admin Login</h2>
+      <label for="adminPassword">Password</label>
+      <input type="password" id="adminPassword" placeholder="Enter admin password" autocomplete="off">
+      <button id="loginBtn" onclick="adminLogin()">Login</button>
+      <div id="loginMsg" class="msg"></div>
+    </div>
+
+    <!-- Admin Dashboard (hidden until login) -->
+    <div id="dashboard" class="hidden">
+
+      <!-- Search User -->
+      <div class="card">
+        <h2>🔍 Search User</h2>
+        <label for="searchQuery">Public Key (full or partial)</label>
+        <input type="text" id="searchQuery" placeholder="Paste wallet address or partial key...">
+        <button onclick="searchUser()">Search</button>
+        <div id="searchMsg" class="msg"></div>
+        <div id="searchResults" class="search-results"></div>
+      </div>
+
+      <!-- Add Balance -->
+      <div class="card">
+        <h2>💰 Add SOL Balance</h2>
+        <div id="selectedUserBox" class="selected-user hidden">
+          <div class="label">Selected User</div>
+          <div id="selectedUserKey">—</div>
+        </div>
+        <label for="targetKey">User Public Key</label>
+        <input type="text" id="targetKey" placeholder="Select from search or paste key...">
+        <label for="addAmount">Amount (SOL)</label>
+        <input type="number" id="addAmount" placeholder="e.g. 1.5" step="0.001" min="0.001">
+        <button onclick="addBalance()">Add Balance</button>
+        <div id="addMsg" class="msg"></div>
+      </div>
+
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <script>
+    let adminPassword = '';
+
+    // Login
+    async function adminLogin() {
+      const pw = document.getElementById('adminPassword').value.trim();
+      if (!pw) return showMsg('loginMsg', 'Enter a password', 'error');
+
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        adminPassword = pw;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+      } else {
+        showMsg('loginMsg', data.error || 'Invalid password', 'error');
+      }
+    }
+
+    // Enter key for login
+    document.getElementById('adminPassword').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') adminLogin();
+    });
+
+    // Search user
+    async function searchUser() {
+      const query = document.getElementById('searchQuery').value.trim();
+      if (!query) return showMsg('searchMsg', 'Enter a public key to search', 'error');
+
+      const res = await fetch('/api/admin/search-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword, query })
+      });
+      const data = await res.json();
+
+      if (!res.ok) return showMsg('searchMsg', data.error || 'Search failed', 'error');
+
+      const container = document.getElementById('searchResults');
+      container.innerHTML = '';
+
+      if (!data.users || data.users.length === 0) {
+        return showMsg('searchMsg', 'No users found', 'error');
+      }
+
+      hideMsg('searchMsg');
+
+      data.users.forEach(u => {
+        const div = document.createElement('div');
+        div.className = 'user-result';
+        div.onclick = () => selectUser(u.public_key);
+        div.innerHTML = `
+          <div class="pk">${u.public_key}</div>
+          <div class="balance-tag">${parseFloat(u.balance || 0).toFixed(4)} SOL</div>
+          <div class="stats">
+            <div>W: <span>${u.wins}</span></div>
+            <div>L: <span>${u.losses}</span></div>
+            <div>K: <span>${u.kills}</span></div>
+            <div>D: <span>${u.deaths}</span></div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Enter key for search
+    document.getElementById('searchQuery').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') searchUser();
+    });
+
+    // Select user from search results
+    function selectUser(publicKey) {
+      document.getElementById('targetKey').value = publicKey;
+      document.getElementById('selectedUserKey').textContent = publicKey;
+      document.getElementById('selectedUserBox').classList.remove('hidden');
+      document.getElementById('addAmount').focus();
+    }
+
+    // Add balance
+    async function addBalance() {
+      const publicKey = document.getElementById('targetKey').value.trim();
+      const amount = document.getElementById('addAmount').value.trim();
+
+      if (!publicKey) return showMsg('addMsg', 'Enter a public key', 'error');
+      if (!amount || parseFloat(amount) <= 0) return showMsg('addMsg', 'Enter a valid amount', 'error');
+
+      const res = await fetch('/api/admin/add-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword, publicKey, amount })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        showMsg('addMsg', `Added ${data.added} SOL — New balance: ${data.newBalance.toFixed(4)} SOL`, 'success');
+        document.getElementById('addAmount').value = '';
+      } else {
+        showMsg('addMsg', data.error || 'Failed to add balance', 'error');
+      }
+    }
+
+    // Logout
+    function logout() {
+      adminPassword = '';
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('adminPassword').value = '';
+      document.getElementById('searchQuery').value = '';
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('targetKey').value = '';
+      document.getElementById('addAmount').value = '';
+      document.getElementById('selectedUserBox').classList.add('hidden');
+    }
+
+    // Helpers
+    function showMsg(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'msg ' + type;
+    }
+    function hideMsg(id) {
+      const el = document.getElementById(id);
+      el.className = 'msg';
+      el.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

@@ -19,6 +19,22 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE INDEX IF NOT EXISTS idx_accounts_leaderboard
   ON accounts (last_active DESC, wins DESC, losses ASC, kills DESC);
 
+-- 1b. Add balance column to accounts (for SOL entry fee system)
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS balance NUMERIC(20, 9) DEFAULT 0;
+
+-- 1c. Game transactions table (entry fees + payouts)
+CREATE TABLE IF NOT EXISTS game_transactions (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  public_key TEXT NOT NULL REFERENCES accounts(public_key),
+  room_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('entry_fee', 'payout', 'deposit')),
+  amount NUMERIC(20, 9) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_transactions_pubkey
+  ON game_transactions (public_key, created_at DESC);
+
 -- 2. Chat messages table (persistent live chat)
 CREATE TABLE IF NOT EXISTS chat_messages (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -67,4 +83,12 @@ CREATE POLICY "Anon can read chat messages"
 
 CREATE POLICY "Anon can insert chat messages"
   ON chat_messages FOR INSERT
+  WITH CHECK (true);
+
+-- 5. RLS for game_transactions
+ALTER TABLE game_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access on game_transactions"
+  ON game_transactions FOR ALL
+  USING (true)
   WITH CHECK (true);

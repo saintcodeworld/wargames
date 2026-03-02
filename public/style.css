@@ -127,6 +127,13 @@ body {
   box-shadow: 0 0 20px rgba(192,57,43,0.2), inset 0 0 30px rgba(192,57,43,0.05);
 }
 
+.mode-option.cooldown-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: #3a3a2a;
+}
+
 .mode-title {
   font-family: 'Black Ops One', 'Press Start 2P', monospace;
   font-size: 20px;
@@ -1126,6 +1133,462 @@ body.in-game #chat-container {
 }
 
 .leaderboard-grid::-webkit-scrollbar-thumb {
+  background: #5a4a2a;
+  border-radius: 2px;
+}
+
+/* ─── Balance Display ─── */
+.balance-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #3a3020;
+  border-radius: 2px;
+}
+
+.balance-icon {
+  color: #9945FF;
+  font-size: 14px;
+}
+
+.balance-amount {
+  color: #ffd700;
+  font-size: 12px;
+  font-family: 'Press Start 2P', monospace;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+.balance-label {
+  color: #8a7a60;
+  font-size: 7px;
+  letter-spacing: 1px;
+}
+
+.deposit-btn {
+  background: linear-gradient(180deg, #9945FF 0%, #7a35d4 100%);
+  color: #fff;
+  border: 1px solid #b366ff;
+  border-bottom: 2px solid #5a20a0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+  margin-left: 6px;
+}
+
+.deposit-btn:hover {
+  background: linear-gradient(180deg, #b366ff 0%, #9945FF 100%);
+  box-shadow: 0 0 15px rgba(153, 69, 255, 0.4);
+  transform: scale(1.05);
+}
+
+/* ─── Entry Fee Section ─── */
+.entry-fee-section {
+  width: 100%;
+  padding: 15px 0;
+  border-top: 1px solid #3a3020;
+  border-bottom: 1px solid #3a3020;
+}
+
+.entry-fee-title {
+  font-size: 11px;
+  color: #8a7a60;
+  letter-spacing: 2px;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.entry-fee-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.fee-option {
+  background: linear-gradient(180deg, rgba(90,74,42,0.15) 0%, rgba(40,30,15,0.25) 100%);
+  border: 2px solid #3a3020;
+  padding: 12px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 70px;
+}
+
+.fee-option:hover {
+  border-color: #8a7a50;
+  background: rgba(90,74,42,0.25);
+  transform: scale(1.05);
+}
+
+.fee-option.selected {
+  border-color: #9945FF;
+  background: linear-gradient(180deg, rgba(153,69,255,0.15) 0%, rgba(40,30,15,0.3) 100%);
+  box-shadow: 0 0 15px rgba(153,69,255,0.2), inset 0 0 20px rgba(153,69,255,0.05);
+}
+
+.fee-option.insufficient {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fee-option.insufficient:hover {
+  transform: none;
+  border-color: #3a3020;
+}
+
+.fee-amount {
+  font-family: 'Black Ops One', 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+  margin-bottom: 4px;
+}
+
+.fee-option.selected .fee-amount {
+  color: #b366ff;
+  text-shadow: 0 0 8px rgba(153, 69, 255, 0.5);
+}
+
+.fee-label {
+  font-size: 7px;
+  color: #8a7a60;
+  letter-spacing: 2px;
+}
+
+.fee-error {
+  color: #c0392b;
+  font-size: 8px;
+  text-align: center;
+  min-height: 16px;
+  margin-top: 8px;
+  text-shadow: 0 0 6px rgba(192,57,43,0.3);
+}
+
+.create-room-btn {
+  width: 100%;
+  margin-top: 10px;
+  background: linear-gradient(180deg, #9945FF 0%, #7a35d4 100%);
+  border-color: #b366ff;
+  border-bottom-color: #5a20a0;
+}
+
+.create-room-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #b366ff 0%, #9945FF 100%);
+  box-shadow: 0 0 20px rgba(153,69,255,0.4);
+}
+
+.create-room-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.create-room-btn:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+/* ─── Prize Pool HUD ─── */
+#prize-pool-hud {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid #9945FF;
+  padding: 8px 20px;
+  border-radius: 4px;
+  box-shadow: 0 0 20px rgba(153, 69, 255, 0.3);
+}
+
+.prize-icon {
+  color: #9945FF;
+  font-size: 16px;
+}
+
+#prize-pool-amount {
+  color: #ffd700;
+  font-size: 14px;
+  font-family: 'Press Start 2P', monospace;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.prize-label {
+  color: #9945FF;
+  font-size: 8px;
+  letter-spacing: 2px;
+}
+
+/* ─── Deposit Modal ─── */
+.deposit-modal-content {
+  max-width: 400px;
+}
+
+.deposit-info {
+  font-size: 8px;
+  color: #8a7a60;
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.deposit-amounts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.deposit-amount-btn {
+  background: linear-gradient(180deg, rgba(153,69,255,0.2) 0%, rgba(40,30,15,0.3) 100%);
+  border: 2px solid #5a3d8a;
+  color: #ffd700;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+.deposit-amount-btn:hover {
+  background: linear-gradient(180deg, rgba(153,69,255,0.35) 0%, rgba(40,30,15,0.4) 100%);
+  border-color: #9945FF;
+  box-shadow: 0 0 15px rgba(153,69,255,0.3);
+  transform: scale(1.03);
+}
+
+.deposit-status {
+  font-size: 8px;
+  text-align: center;
+  min-height: 16px;
+  margin-bottom: 10px;
+  color: #4caf50;
+}
+
+.deposit-status.error {
+  color: #c0392b;
+}
+
+/* ─── Deposit Address Section (Step 2) ─── */
+.deposit-address-section {
+  padding: 10px 0;
+}
+
+.deposit-selected-amount {
+  font-size: 12px;
+  color: #c0b080;
+  text-align: center;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.deposit-highlight {
+  color: #ffd700;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.deposit-address-label {
+  font-size: 8px;
+  color: #8a7a60;
+  text-align: center;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.deposit-address-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #9945FF;
+  padding: 10px 12px;
+  margin-bottom: 15px;
+  word-break: break-all;
+}
+
+.deposit-wallet-text {
+  flex: 1;
+  font-size: 9px;
+  color: #b366ff;
+  font-family: 'Press Start 2P', monospace;
+  line-height: 1.6;
+  user-select: all;
+}
+
+.copy-btn {
+  background: linear-gradient(180deg, #9945FF 0%, #7a35d4 100%);
+  color: #fff;
+  border: 1px solid #b366ff;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: linear-gradient(180deg, #b366ff 0%, #9945FF 100%);
+  box-shadow: 0 0 10px rgba(153, 69, 255, 0.4);
+}
+
+.deposit-instructions {
+  margin-bottom: 15px;
+}
+
+.deposit-instruction-item {
+  font-size: 7px;
+  color: #8a7a60;
+  line-height: 2.2;
+  padding-left: 5px;
+}
+
+.verify-btn {
+  width: 100%;
+  background: linear-gradient(180deg, #27ae60 0%, #1e8449 100%);
+  border: 1px solid #2ecc71;
+  border-bottom: 2px solid #196f3d;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.verify-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2ecc71 0%, #27ae60 100%);
+  box-shadow: 0 0 15px rgba(46, 204, 113, 0.4);
+}
+
+.verify-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.back-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #3a3020;
+  color: #8a7a60;
+  font-size: 8px;
+}
+
+.back-btn:hover {
+  border-color: #8a7a60;
+  color: #c0b080;
+}
+
+/* ─── Room Item Entry Fee Display ─── */
+.room-fee {
+  font-size: 9px;
+  color: #ffd700;
+  text-shadow: 0 0 6px rgba(255, 215, 0, 0.3);
+  margin-top: 4px;
+}
+
+.room-prize {
+  font-size: 8px;
+  color: #9945FF;
+  margin-top: 2px;
+}
+
+/* ─── Account Balance in Popup ─── */
+.stat-balance {
+  margin-top: 10px;
+  background: rgba(153, 69, 255, 0.08);
+  border-color: #5a3d8a;
+}
+
+/* ─── Match End Prize Info ─── */
+.match-prize-info {
+  font-size: 14px;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  margin-top: 10px;
+}
+
+.match-payout {
+  font-size: 11px;
+  color: #4caf50;
+  text-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+  margin-top: 5px;
+}
+
+/* ─── How It Works Button ─── */
+.how-it-works-btn {
+  background: transparent;
+  color: #8a7a60;
+  border: 1px solid #5a4a2a;
+  border-bottom: 2px solid #3a2a15;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 10px 20px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  margin-top: 20px;
+}
+
+.how-it-works-btn:hover {
+  color: #d4a84b;
+  border-color: #8a7a50;
+  background: rgba(90,74,42,0.15);
+  box-shadow: 0 0 12px rgba(212,168,75,0.15);
+}
+
+/* ─── How It Works Popup ─── */
+.how-it-works-content {
+  max-width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.hiw-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.hiw-section {
+  border-left: 2px solid #5a4a2a;
+  padding-left: 12px;
+}
+
+.hiw-section-title {
+  font-size: 10px;
+  color: #d4a84b;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.hiw-step {
+  font-size: 7px;
+  color: #b0a080;
+  line-height: 2;
+  letter-spacing: 0.5px;
+}
+
+.how-it-works-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.how-it-works-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.how-it-works-content::-webkit-scrollbar-thumb {
   background: #5a4a2a;
   border-radius: 2px;
 }

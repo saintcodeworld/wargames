@@ -6,6 +6,7 @@
   let currentAccount = null; // { publicKey, privateKey }
   let supabaseClient = null; // Supabase client for realtime chat
   let chatSubscription = null; // Supabase realtime subscription
+  const displayedMessageIds = new Set(); // Dedup chat messages between socket.io and realtime
 
   const socket = io();
 
@@ -34,11 +35,8 @@
         table: 'chat_messages'
       }, (payload) => {
         const m = payload.new;
-        // Only add if not already added by socket (avoid duplicates)
-        // We use a simple dedup: if the message was from us via socket, skip
         if (m && m.player_name && m.message) {
-          // Supabase realtime is supplementary; socket.io handles primary broadcast
-          // This ensures messages persist across page refreshes
+          addChatMessage(m.player_name, m.message, m.id);
         }
       })
       .subscribe();
@@ -74,7 +72,7 @@
       const res = await fetch('/api/chat/recent');
       const messages = await res.json();
       messages.forEach(m => {
-        addChatMessage(m.playerName, m.message);
+        addChatMessage(m.playerName, m.message, m.id);
       });
     } catch (e) {}
   }
@@ -101,6 +99,21 @@
   const accountCloseBtn = document.getElementById('account-close-btn');
   const lobbyUsername = document.getElementById('lobby-username');
   const leaderboardGrid = document.getElementById('leaderboard-grid');
+  const lobbyBalance = document.getElementById('lobby-balance');
+  const depositBtn = document.getElementById('deposit-btn');
+  const depositModal = document.getElementById('deposit-modal');
+  const depositCloseBtn = document.getElementById('deposit-close-btn');
+  const depositStatus = document.getElementById('deposit-status');
+  const entryFeeSection = document.getElementById('entry-fee-section');
+  const feeError = document.getElementById('fee-error');
+  const createRoomBtn = document.getElementById('create-room-btn');
+  const prizePoolHud = document.getElementById('prize-pool-hud');
+  const prizePoolAmount = document.getElementById('prize-pool-amount');
+  const accountBalance = document.getElementById('account-balance');
+
+  let playerBalance = 0;
+  let selectedEntryFee = null;
+  let currentPrizePool = 0;
 
   // ─── Auth Handlers ───
   signupBtn.addEventListener('click', async () => {
@@ -152,6 +165,42 @@
     socket.emit('bind_session', currentAccount.publicKey);
     fetchLeaderboard();
     loadChatHistory();
+    fetchBalance();
+  }
+
+  // ─── Balance Management ───
+  async function fetchBalance() {
+    if (!currentAccount) return;
+    try {
+      const res = await fetch('/api/balance/' + currentAccount.publicKey);
+      const data = await res.json();
+      playerBalance = data.balance || 0;
+      updateBalanceDisplay();
+    } catch (e) {}
+  }
+
+  function updateBalanceDisplay() {
+    const formatted = playerBalance.toFixed(2);
+    lobbyBalance.textContent = formatted;
+    if (accountBalance) accountBalance.textContent = formatted + ' SOL';
+    // Update fee option availability
+    updateFeeOptions();
+  }
+
+  function updateFeeOptions() {
+    document.querySelectorAll('.fee-option').forEach(opt => {
+      const fee = parseFloat(opt.dataset.fee);
+      if (fee > playerBalance) {
+        opt.classList.add('insufficient');
+        if (opt.classList.contains('selected')) {
+          opt.classList.remove('selected');
+          selectedEntryFee = null;
+          createRoomBtn.disabled = true;
+        }
+      } else {
+        opt.classList.remove('insufficient');
+      }
+    });
   }
 
   // ─── Account Popup ───
@@ -167,8 +216,137 @@
       accountLosses.textContent = data.losses || 0;
       accountKills.textContent = data.kills || 0;
       accountDeaths.textContent = data.deaths || 0;
+      if (data.balance !== undefined) {
+        playerBalance = data.balance;
+        updateBalanceDisplay();
+      }
     } catch (e) {}
     accountPopup.style.display = 'flex';
+  });
+
+  // ─── Deposit Modal ───
+  let platformWallet = '';
+  let selectedDepositAmount = 0;
+  const depositStepAmounts = document.getElementById('deposit-step-amounts');
+  const depositStepAddress = document.getElementById('deposit-step-address');
+  const depositExactAmount = document.getElementById('deposit-exact-amount');
+  const depositWalletAddress = document.getElementById('deposit-wallet-address');
+  const copyWalletBtn = document.getElementById('copy-wallet-btn');
+  const depositVerifyBtn = document.getElementById('deposit-verify-btn');
+  const depositVerifyStatus = document.getElementById('deposit-verify-status');
+  const depositBackBtn = document.getElementById('deposit-back-btn');
+
+  // Fetch platform wallet on load
+  async function fetchPlatformWallet() {
+    try {
+      const res = await fetch('/api/platform-wallet');
+      const data = await res.json();
+      if (data.wallet) platformWallet = data.wallet;
+    } catch (e) {}
+  }
+  fetchPlatformWallet();
+
+  depositBtn.addEventListener('click', () => {
+    depositStatus.textContent = '';
+    depositStatus.className = 'deposit-status';
+    depositVerifyStatus.textContent = '';
+    depositVerifyStatus.className = 'deposit-status';
+    // Reset to step 1
+    depositStepAmounts.style.display = 'grid';
+    depositStepAddress.style.display = 'none';
+    selectedDepositAmount = 0;
+    depositModal.style.display = 'flex';
+  });
+
+  depositCloseBtn.addEventListener('click', () => {
+    depositModal.style.display = 'none';
+  });
+
+  // Step 1: User selects deposit amount → show wallet address
+  document.querySelectorAll('.deposit-amount-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedDepositAmount = parseFloat(btn.dataset.amount);
+      // Show step 2: wallet address + instructions
+      depositStepAmounts.style.display = 'none';
+      depositStepAddress.style.display = 'block';
+      depositExactAmount.textContent = selectedDepositAmount;
+      // Update all repeat elements
+      document.querySelectorAll('.deposit-exact-repeat').forEach(el => {
+        el.textContent = selectedDepositAmount;
+      });
+      depositWalletAddress.textContent = platformWallet || 'Not configured';
+      depositVerifyStatus.textContent = '';
+      depositVerifyStatus.className = 'deposit-status';
+      depositStatus.textContent = '';
+    });
+  });
+
+  // Copy wallet address
+  copyWalletBtn.addEventListener('click', () => {
+    if (!platformWallet) return;
+    navigator.clipboard.writeText(platformWallet).then(() => {
+      copyWalletBtn.textContent = 'COPIED!';
+      setTimeout(() => { copyWalletBtn.textContent = 'COPY'; }, 2000);
+    }).catch(() => {
+      // Fallback
+      const textArea = document.createElement('textarea');
+      textArea.value = platformWallet;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      copyWalletBtn.textContent = 'COPIED!';
+      setTimeout(() => { copyWalletBtn.textContent = 'COPY'; }, 2000);
+    });
+  });
+
+  // Step 2: User clicks "I've sent it" → prompt for tx signature → verify on-chain
+  depositVerifyBtn.addEventListener('click', async () => {
+    const signature = prompt('Paste your Solana transaction signature (hash):');
+    if (!signature || !signature.trim()) return;
+
+    depositVerifyStatus.textContent = 'Verifying transaction on-chain...';
+    depositVerifyStatus.className = 'deposit-status';
+    depositVerifyBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/verify-deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publicKey: currentAccount.publicKey,
+          amount: selectedDepositAmount,
+          signature: signature.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.error) {
+        depositVerifyStatus.textContent = data.error;
+        depositVerifyStatus.className = 'deposit-status error';
+      } else {
+        playerBalance = data.balance;
+        updateBalanceDisplay();
+        depositVerifyStatus.textContent = data.message || 'Deposit verified!';
+        depositVerifyStatus.className = 'deposit-status';
+        // Return to step 1 after short delay
+        setTimeout(() => {
+          depositStepAmounts.style.display = 'grid';
+          depositStepAddress.style.display = 'none';
+        }, 3000);
+      }
+    } catch (e) {
+      depositVerifyStatus.textContent = 'Verification failed. Please try again.';
+      depositVerifyStatus.className = 'deposit-status error';
+    }
+    depositVerifyBtn.disabled = false;
+  });
+
+  // Back button: return to amount selection
+  depositBackBtn.addEventListener('click', () => {
+    depositStepAmounts.style.display = 'grid';
+    depositStepAddress.style.display = 'none';
+    depositVerifyStatus.textContent = '';
+    selectedDepositAmount = 0;
   });
 
   accountPrivateKey.addEventListener('click', () => {
@@ -194,6 +372,16 @@
     loginForm.style.display = 'none';
     loginPrivateKeyInput.value = '';
   });
+
+  // ─── How It Works Popup ───
+  const hiwPopup = document.getElementById('how-it-works-popup');
+  const hiwCloseBtn = document.getElementById('how-it-works-close-btn');
+  const hiwBtnAuth = document.getElementById('how-it-works-btn-auth');
+  const hiwBtnLobby = document.getElementById('how-it-works-btn-lobby');
+
+  hiwBtnAuth.addEventListener('click', () => { hiwPopup.style.display = 'flex'; });
+  hiwBtnLobby.addEventListener('click', () => { hiwPopup.style.display = 'flex'; });
+  hiwCloseBtn.addEventListener('click', () => { hiwPopup.style.display = 'none'; });
 
   // ─── Leaderboard ───
   async function fetchLeaderboard() {
@@ -331,16 +519,87 @@
 
   // ─── Lobby ───
   let selectedMode = '1v1';
+  let roomCreateCooldown = false;
+  let roomCreateCooldownTimer = null;
 
-  // Mode selection
+  function startRoomCooldown(seconds) {
+    roomCreateCooldown = true;
+    let remaining = seconds;
+    const modeOptions = document.querySelectorAll('.mode-option');
+    modeOptions.forEach(opt => {
+      opt.classList.add('cooldown-disabled');
+      const title = opt.querySelector('.mode-title');
+      if (title) title.dataset.originalText = title.textContent;
+    });
+
+    function updateCooldownText() {
+      modeOptions.forEach(opt => {
+        const title = opt.querySelector('.mode-title');
+        if (title) title.textContent = `${title.dataset.originalText} (${remaining}s)`;
+      });
+    }
+    updateCooldownText();
+
+    if (roomCreateCooldownTimer) clearInterval(roomCreateCooldownTimer);
+    roomCreateCooldownTimer = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(roomCreateCooldownTimer);
+        roomCreateCooldownTimer = null;
+        roomCreateCooldown = false;
+        modeOptions.forEach(opt => {
+          opt.classList.remove('cooldown-disabled');
+          const title = opt.querySelector('.mode-title');
+          if (title) title.textContent = title.dataset.originalText;
+        });
+      } else {
+        updateCooldownText();
+      }
+    }, 1000);
+  }
+
+  // Mode selection — shows entry fee picker
   document.querySelectorAll('.mode-option').forEach(option => {
     option.addEventListener('click', () => {
+      if (roomCreateCooldown) return;
       document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
       option.classList.add('selected');
       selectedMode = option.dataset.mode;
-      // Create room immediately when mode is selected
-      socket.emit('create_room', selectedMode);
+      // Show entry fee section
+      entryFeeSection.style.display = 'block';
+      feeError.textContent = '';
+      selectedEntryFee = null;
+      createRoomBtn.disabled = true;
+      document.querySelectorAll('.fee-option').forEach(f => f.classList.remove('selected'));
+      updateFeeOptions();
     });
+  });
+
+  // Entry fee selection
+  document.querySelectorAll('.fee-option').forEach(option => {
+    option.addEventListener('click', () => {
+      const fee = parseFloat(option.dataset.fee);
+      if (fee > playerBalance) {
+        feeError.textContent = 'Insufficient balance. Deposit SOL to play!';
+        return;
+      }
+      feeError.textContent = '';
+      document.querySelectorAll('.fee-option').forEach(f => f.classList.remove('selected'));
+      option.classList.add('selected');
+      selectedEntryFee = fee;
+      createRoomBtn.disabled = false;
+    });
+  });
+
+  // Create room button
+  createRoomBtn.addEventListener('click', () => {
+    if (!selectedEntryFee || !selectedMode) return;
+    if (selectedEntryFee > playerBalance) {
+      feeError.textContent = 'Insufficient balance. Deposit SOL to play!';
+      return;
+    }
+    feeError.textContent = '';
+    socket.emit('create_room', { mode: selectedMode, entryFee: selectedEntryFee });
   });
 
   refreshRoomsBtn.addEventListener('click', () => {
@@ -355,17 +614,28 @@
       const roomEl = document.createElement('div');
       roomEl.className = 'room-item';
       roomEl.dataset.mode = room.mode.toUpperCase();
+      const canAfford = playerBalance >= (room.entryFee || 0);
       roomEl.innerHTML = `
         <div class="room-info">
           <div class="room-id">${room.id}</div>
           <div class="room-status">${room.status.toUpperCase()}</div>
+          <div class="room-fee">${room.entryFee || 0} SOL ENTRY</div>
+          <div class="room-prize">Prize Pool: ${room.prizePool || 0} SOL</div>
         </div>
         <div class="room-players">${room.playerCount}/${room.maxPlayers}</div>
       `;
 
       roomEl.addEventListener('click', () => {
+        if (!canAfford) {
+          alert('Insufficient balance! You need ' + room.entryFee + ' SOL to join. Deposit funds first.');
+          return;
+        }
         socket.emit('join_room', room.id);
       });
+
+      if (!canAfford) {
+        roomEl.style.opacity = '0.5';
+      }
 
       roomsGrid.appendChild(roomEl);
     });
@@ -386,7 +656,31 @@
     alert(data.message);
   });
 
-  socket.on('game_countdown_start', () => {
+  // Handle room creation response
+  socket.on('room_created', (roomId) => {
+    // Room was created, now auto-join it
+    socket.emit('join_room', roomId);
+    // Reset the entry fee UI
+    entryFeeSection.style.display = 'none';
+    document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
+  });
+
+  socket.on('room_error', (data) => {
+    if (data.cooldownRemaining) {
+      startRoomCooldown(data.cooldownRemaining);
+    }
+    feeError.textContent = data.message || 'Error creating room';
+  });
+
+  socket.on('balance_updated', (data) => {
+    playerBalance = data.balance;
+    updateBalanceDisplay();
+  });
+
+  socket.on('game_countdown_start', (data) => {
+    if (data && data.prizePool !== undefined) {
+      currentPrizePool = data.prizePool;
+    }
     countdownOverlay.style.display = 'flex';
     countdownOverlay.style.opacity = '1';
     let count = 3;
@@ -438,12 +732,32 @@
   socket.on('match_end', (data) => {
     roundTimerOverlay.style.display = 'flex';
     roundWinnerEl.textContent = `${data.winner.toUpperCase()} WIN THE MATCH!`;
-    roundScoresEl.textContent = 'BEST OF 3 VICTORY';
+    let prizeText = 'BEST OF 3 VICTORY';
+    if (data.prizePool) {
+      prizeText += `\nPRIZE POOL: ${data.prizePool} SOL`;
+    }
+    roundScoresEl.innerHTML = prizeText.replace('\n', '<br>');
+    
+    // Show payout info
+    if (data.payoutPerWinner && data.winner === myTeam) {
+      const payoutEl = document.createElement('div');
+      payoutEl.className = 'match-payout';
+      payoutEl.textContent = `YOU WON +${data.payoutPerWinner.toFixed(4)} SOL!`;
+      roundTimerOverlay.querySelector('.round-timer-content').appendChild(payoutEl);
+    } else if (data.winner !== myTeam) {
+      const lostEl = document.createElement('div');
+      lostEl.className = 'match-prize-info';
+      lostEl.style.color = '#c0392b';
+      lostEl.textContent = 'ENTRY FEE LOST';
+      roundTimerOverlay.querySelector('.round-timer-content').appendChild(lostEl);
+    }
     roundTimerOverlay.querySelector('.round-timer').style.display = 'none';
   });
 
   socket.on('return_to_lobby', (data) => {
-    // Hide match overlay
+    // Hide match overlay and clean up any appended elements
+    const timerContent = roundTimerOverlay.querySelector('.round-timer-content');
+    timerContent.querySelectorAll('.match-payout, .match-prize-info').forEach(el => el.remove());
     roundTimerOverlay.style.display = 'none';
     roundTimerOverlay.querySelector('.round-timer').style.display = 'block';
 
@@ -453,6 +767,7 @@
     document.getElementById('scoreboard').style.display = 'none';
     document.getElementById('hud').style.display = 'none';
     document.getElementById('room-info').style.display = 'none';
+    prizePoolHud.style.display = 'none';
     document.body.classList.remove('in-game');
     showLobbyUI();
     joined = false;
@@ -465,6 +780,7 @@
     serverState = { players: {}, bullets: [], scores: { usa: 0, iran: 0 } };
     inputs = { left: false, right: false, up: false, down: false };
     pendingInputs = [];
+    currentPrizePool = 0;
 
     // Update account stats from server response
     if (data.stats && currentAccount) {
@@ -472,7 +788,14 @@
       accountLosses.textContent = data.stats.losses || 0;
       accountKills.textContent = data.stats.kills || 0;
       accountDeaths.textContent = data.stats.deaths || 0;
+      if (data.stats.balance !== undefined) {
+        playerBalance = data.stats.balance;
+        updateBalanceDisplay();
+      }
     }
+
+    // Fetch latest balance
+    fetchBalance();
 
     // Notify server to reset room tracking for this socket
     socket.emit('returned_to_lobby');
@@ -497,10 +820,6 @@
     }
   });
 
-  socket.on('game_start', () => {
-    // Game starts automatically after countdown
-  });
-
   socket.on('game_reset', () => {
     // Other player left during game
     document.getElementById('game-container').style.display = 'none';
@@ -508,9 +827,11 @@
     document.getElementById('scoreboard').style.display = 'none';
     document.getElementById('hud').style.display = 'none';
     document.getElementById('room-info').style.display = 'none';
+    prizePoolHud.style.display = 'none';
     document.body.classList.remove('in-game'); // Remove game class
     showLobbyUI(); // Show chat and hide controls
     fetchLeaderboard(); // Refresh leaderboard on return to lobby
+    fetchBalance(); // Refresh balance (might have been refunded)
     joined = false;
   });
 
@@ -518,12 +839,17 @@
     myId = data.id;
     myTeam = data.team;
     config = data;
-    socket.on('game_start', () => {
+    if (data.prizePool !== undefined) currentPrizePool = data.prizePool;
+    socket.on('game_start', (startData) => {
+      if (startData && startData.prizePool !== undefined) currentPrizePool = startData.prizePool;
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game-container').style.display = 'block';
       document.getElementById('scoreboard').style.display = 'flex';
       document.getElementById('hud').style.display = 'flex';
       document.getElementById('room-info').style.display = 'block';
+      // Show prize pool HUD
+      prizePoolHud.style.display = 'flex';
+      prizePoolAmount.textContent = currentPrizePool.toFixed(2);
       document.body.classList.add('in-game'); // Add class for CSS targeting
       showGameUI(); // This will hide chat and show controls
       // Force hide chat directly as backup
@@ -572,7 +898,16 @@
 
   // Chat visibility is controlled by showGameUI() and showLobbyUI() functions
 
-  function addChatMessage(playerName, message) {
+  function addChatMessage(playerName, message, msgId) {
+    // Deduplicate messages using ID (from Supabase) or content hash
+    const key = msgId || `${playerName}:${message}:${Date.now()}`;
+    if (msgId && displayedMessageIds.has(msgId)) return;
+    if (msgId) displayedMessageIds.add(msgId);
+    // Cap the dedup set to prevent memory leak
+    if (displayedMessageIds.size > 200) {
+      const first = displayedMessageIds.values().next().value;
+      displayedMessageIds.delete(first);
+    }
     const msgElement = document.createElement('div');
     msgElement.className = 'chat-message';
     msgElement.innerHTML = `<span class="player-name">${playerName}:</span>${message}`;
@@ -596,8 +931,8 @@
 
   chatSend.addEventListener('click', sendChatMessage);
 
-  socket.on('chat_message', ({ playerName, message }) => {
-    addChatMessage(playerName, message);
+  socket.on('chat_message', ({ playerName, message, msgId }) => {
+    addChatMessage(playerName, message, msgId);
   });
 
   // ─── Auto-login on page load ───

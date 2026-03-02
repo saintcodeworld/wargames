@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { Keypair } = require('@solana/web3.js');
+const { Keypair, Connection, PublicKey, LAMPORTS_PER_SOL } = require('@solana/web3.js');
 const bs58 = require('bs58');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -23,6 +23,98 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
+
+// ─── Admin Panel ───
+const ADMIN_PASSWORD = 'admincryptotok';
+
+// Serve admin page
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Admin login
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    return res.json({ success: true });
+  }
+  res.status(401).json({ error: 'Invalid password' });
+});
+
+// Admin: search user by public key
+app.post('/api/admin/search-user', (req, res) => {
+  const { password, query } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!query) return res.status(400).json({ error: 'Search query required' });
+
+  // Search in Supabase by partial public key
+  supabase
+    .from('accounts')
+    .select('public_key, balance, wins, losses, kills, deaths, last_active')
+    .ilike('public_key', `%${query}%`)
+    .limit(20)
+    .then(({ data, error }) => {
+      if (error) return res.status(500).json({ error: 'Search failed' });
+      res.json({ users: data || [] });
+    });
+});
+
+// Admin: add SOL balance to a user
+app.post('/api/admin/add-balance', async (req, res) => {
+  const { password, publicKey, amount } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!publicKey || !amount || isNaN(amount) || parseFloat(amount) <= 0) {
+    return res.status(400).json({ error: 'Valid public key and positive amount required' });
+  }
+
+  const solAmount = parseFloat(amount);
+
+  try {
+    // Check if user exists
+    const { data: user, error: fetchErr } = await supabase
+      .from('accounts')
+      .select('public_key, balance')
+      .eq('public_key', publicKey)
+      .single();
+
+    if (fetchErr || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newBalance = parseFloat(user.balance || 0) + solAmount;
+
+    // Update in Supabase
+    const { error: updateErr } = await supabase
+      .from('accounts')
+      .update({ balance: newBalance })
+      .eq('public_key', publicKey);
+
+    if (updateErr) {
+      return res.status(500).json({ error: 'Failed to update balance' });
+    }
+
+    // Update cache if present
+    if (accountsCache[publicKey]) {
+      accountsCache[publicKey].balance = newBalance;
+    }
+
+    // Log as admin deposit
+    await supabase.from('game_transactions').insert({
+      public_key: publicKey,
+      room_id: 'ADMIN_CREDIT',
+      type: 'deposit',
+      amount: solAmount
+    });
+
+    res.json({ success: true, newBalance, added: solAmount });
+  } catch (e) {
+    console.error('Admin add balance error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Expose Supabase config to the client (anon key only, safe for browser)
@@ -32,6 +124,16 @@ app.get('/api/supabase-config', (req, res) => {
     anonKey: process.env.SUPABASE_ANON_KEY
   });
 });
+
+// ─── Solana Connection & Platform Wallet ───
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const PLATFORM_WALLET = process.env.PLATFORM_WALLET || '';
+const solanaConnection = new Connection(SOLANA_RPC_URL, 'confirmed');
+
+// ─── Entry Fee Options (SOL) ───
+const VALID_ENTRY_FEES = [0.01, 0.05, 0.1, 0.5];
+const PLATFORM_FEE_PERCENT = 0; // 0% platform fee for now
+const processedSignatures = new Set(); // Track already-credited tx signatures
 
 // ─── Accounts & Leaderboard (Supabase-backed) ───
 const accountsCache = {}; // In-memory cache for active game sessions
@@ -54,6 +156,7 @@ async function getAccount(publicKey) {
     losses: data.losses,
     kills: data.kills,
     deaths: data.deaths,
+    balance: parseFloat(data.balance) || 0,
     lastActive: new Date(data.last_active).getTime()
   };
   accountsCache[publicKey] = acc;
@@ -71,6 +174,7 @@ async function saveAccountStats(publicKey) {
       losses: acc.losses,
       kills: acc.kills,
       deaths: acc.deaths,
+      balance: acc.balance,
       last_active: new Date().toISOString()
     })
     .eq('public_key', publicKey);
@@ -97,7 +201,7 @@ app.post('/api/signup', async (req, res) => {
       return res.status(500).json({ error: 'Signup failed' });
     }
 
-    accountsCache[publicKey] = { publicKey, privateKey, wins: 0, losses: 0, kills: 0, deaths: 0, lastActive: Date.now() };
+    accountsCache[publicKey] = { publicKey, privateKey, wins: 0, losses: 0, kills: 0, deaths: 0, balance: 0, lastActive: Date.now() };
     res.json({ publicKey, privateKey });
   } catch (e) {
     console.error('Signup error:', e);
@@ -130,7 +234,7 @@ app.post('/api/login', async (req, res) => {
         console.error('Login auto-register error:', error);
         return res.status(500).json({ error: 'Login failed' });
       }
-      acc = { publicKey, privateKey, wins: 0, losses: 0, kills: 0, deaths: 0, lastActive: Date.now() };
+      acc = { publicKey, privateKey, wins: 0, losses: 0, kills: 0, deaths: 0, balance: 0, lastActive: Date.now() };
     }
 
     // Update last active
@@ -152,9 +256,124 @@ app.get('/api/account/:publicKey', async (req, res) => {
   try {
     const acc = await getAccount(req.params.publicKey);
     if (!acc) return res.status(404).json({ error: 'Account not found' });
-    res.json({ publicKey: acc.publicKey, wins: acc.wins, losses: acc.losses, kills: acc.kills, deaths: acc.deaths });
+    res.json({ publicKey: acc.publicKey, wins: acc.wins, losses: acc.losses, kills: acc.kills, deaths: acc.deaths, balance: acc.balance });
   } catch (e) {
     res.status(500).json({ error: 'Failed to fetch account' });
+  }
+});
+
+// Get balance
+app.get('/api/balance/:publicKey', async (req, res) => {
+  try {
+    const acc = await getAccount(req.params.publicKey);
+    if (!acc) return res.status(404).json({ error: 'Account not found' });
+    res.json({ balance: acc.balance });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
+
+// Get platform wallet address (for deposits)
+app.get('/api/platform-wallet', (req, res) => {
+  if (!PLATFORM_WALLET) {
+    return res.status(500).json({ error: 'Platform wallet not configured' });
+  }
+  res.json({ wallet: PLATFORM_WALLET });
+});
+
+// Verify on-chain deposit: check that user sent SOL to platform wallet
+app.post('/api/verify-deposit', async (req, res) => {
+  try {
+    const { publicKey, amount, signature } = req.body;
+    if (!publicKey || !amount || !signature) {
+      return res.status(400).json({ error: 'Missing publicKey, amount, or signature' });
+    }
+    if (!PLATFORM_WALLET) {
+      return res.status(500).json({ error: 'Platform wallet not configured' });
+    }
+
+    const acc = await getAccount(publicKey);
+    if (!acc) return res.status(404).json({ error: 'Account not found' });
+
+    // Prevent double-crediting the same transaction
+    if (processedSignatures.has(signature)) {
+      return res.status(400).json({ error: 'This transaction has already been credited' });
+    }
+
+    // Also check DB for processed signatures
+    const { data: existingTx } = await supabase
+      .from('game_transactions')
+      .select('id')
+      .eq('room_id', signature)
+      .eq('type', 'deposit')
+      .single();
+    if (existingTx) {
+      processedSignatures.add(signature);
+      return res.status(400).json({ error: 'This transaction has already been credited' });
+    }
+
+    // Fetch and verify the transaction on-chain
+    const txInfo = await solanaConnection.getParsedTransaction(signature, {
+      commitment: 'confirmed',
+      maxSupportedTransactionVersion: 0
+    });
+
+    if (!txInfo) {
+      return res.status(400).json({ error: 'Transaction not found. Please wait for confirmation and try again.' });
+    }
+
+    if (txInfo.meta && txInfo.meta.err) {
+      return res.status(400).json({ error: 'Transaction failed on-chain' });
+    }
+
+    // Verify the transaction: check that it transfers SOL to platform wallet from the user
+    const expectedLamports = Math.round(parseFloat(amount) * LAMPORTS_PER_SOL);
+    let verified = false;
+
+    // Check pre/post balances for the platform wallet
+    const accountKeys = txInfo.transaction.message.accountKeys.map(k => k.pubkey ? k.pubkey.toString() : k.toString());
+    const platformIndex = accountKeys.indexOf(PLATFORM_WALLET);
+    const senderIndex = accountKeys.indexOf(publicKey);
+
+    if (platformIndex !== -1 && senderIndex !== -1 && txInfo.meta) {
+      const preBalance = txInfo.meta.preBalances[platformIndex];
+      const postBalance = txInfo.meta.postBalances[platformIndex];
+      const received = postBalance - preBalance;
+
+      // Allow small tolerance for rounding (within 5000 lamports / 0.000005 SOL)
+      if (received >= expectedLamports - 5000) {
+        verified = true;
+      }
+    }
+
+    if (!verified) {
+      return res.status(400).json({ error: 'Could not verify transfer. Make sure you sent the exact amount to the correct wallet.' });
+    }
+
+    // Credit the user's balance
+    const depositAmount = parseFloat(amount);
+    acc.balance = (acc.balance || 0) + depositAmount;
+    accountsCache[publicKey] = acc;
+
+    await supabase
+      .from('accounts')
+      .update({ balance: acc.balance })
+      .eq('public_key', publicKey);
+
+    // Log transaction (use signature as room_id for uniqueness)
+    await supabase.from('game_transactions').insert({
+      public_key: publicKey,
+      room_id: signature,
+      type: 'deposit',
+      amount: depositAmount
+    });
+
+    processedSignatures.add(signature);
+
+    res.json({ balance: acc.balance, message: `+${depositAmount} SOL deposited successfully!` });
+  } catch (e) {
+    console.error('Verify deposit error:', e);
+    res.status(500).json({ error: 'Verification failed. Please try again.' });
   }
 });
 
@@ -166,6 +385,7 @@ app.get('/api/leaderboard', async (req, res) => {
       .from('accounts')
       .select('public_key, wins, losses, kills, deaths')
       .gte('last_active', oneDayAgo)
+      .or('wins.gt.0,losses.gt.0')
       .order('wins', { ascending: false })
       .order('losses', { ascending: true })
       .order('kills', { ascending: false })
@@ -202,6 +422,7 @@ app.get('/api/chat/recent', async (req, res) => {
     if (error) return res.json([]);
     // Reverse so oldest is first
     res.json((data || []).reverse().map(m => ({
+      id: m.id,
       playerName: m.player_name,
       message: m.message,
       publicKey: m.public_key,
@@ -253,8 +474,10 @@ const TRENCH_RIGHT = { x1: 1250, x2: 1550, depth: 40 };
 // ─── Room State ───
 const rooms = {};
 const playerRooms = {}; // Track which room each player is in
+const roomCreationCooldowns = {}; // { publicKey: timestamp } — 15s cooldown per user
 
-function createRoom(roomId, creatorId, mode) {
+function createRoom(roomId, creatorId, mode, entryFee) {
+  const maxPlayers = mode === '1v1' ? 2 : 4;
   return {
     id: roomId,
     players: {},
@@ -269,7 +492,10 @@ function createRoom(roomId, creatorId, mode) {
     roundEndTime: null, // Track when round ends for restart timer
     currentRound: 1, // Track current round number
     mode: mode, // '1v1' or '2v2'
-    maxPlayers: mode === '1v1' ? 2 : 4
+    maxPlayers: maxPlayers,
+    entryFee: entryFee, // SOL entry fee per player
+    prizePool: 0, // Total SOL in the prize pool
+    paidPlayers: {} // { publicKey: amount } — track who paid
   };
 }
 
@@ -286,7 +512,9 @@ function getAvailableRooms() {
         status: room.status,
         createdAt: room.createdAt,
         mode: room.mode,
-        maxPlayers: room.maxPlayers
+        maxPlayers: room.maxPlayers,
+        entryFee: room.entryFee,
+        prizePool: room.prizePool
       });
     }
   }
@@ -533,12 +761,32 @@ function tickRoom(room) {
       // Check for match winner
       const winner = checkMatchWinner(room);
       if (winner) {
-        // Update win/loss stats for all players
+        // Count winning team players
+        let winnerCount = 0;
+        for (const pid in room.players) {
+          if (room.players[pid].team === winner) winnerCount++;
+        }
+
+        // Calculate payout per winner
+        const totalPrize = room.prizePool;
+        const platformCut = totalPrize * (PLATFORM_FEE_PERCENT / 100);
+        const payoutPerWinner = winnerCount > 0 ? (totalPrize - platformCut) / winnerCount : 0;
+
+        // Update win/loss stats and distribute prize pool
         for (const pid in room.players) {
           const pubKey = activeSessions[pid];
           if (pubKey && accountsCache[pubKey]) {
             if (room.players[pid].team === winner) {
               accountsCache[pubKey].wins++;
+              // Award prize pool share
+              accountsCache[pubKey].balance += payoutPerWinner;
+              // Log payout transaction
+              supabase.from('game_transactions').insert({
+                public_key: pubKey,
+                room_id: room.id,
+                type: 'payout',
+                amount: payoutPerWinner
+              }).then(() => {}).catch(e => console.error('Payout log error:', e));
             } else {
               accountsCache[pubKey].losses++;
             }
@@ -547,7 +795,9 @@ function tickRoom(room) {
             saveAccountStats(pubKey);
           }
         }
-        io.to(room.id).emit('match_end', { winner });
+        room.prizePool = 0; // Prize pool distributed
+
+        io.to(room.id).emit('match_end', { winner, prizePool: totalPrize, payoutPerWinner });
         room.status = 'match_over';
 
         // After 5 seconds, kick all players back to lobby
@@ -566,7 +816,8 @@ function tickRoom(room) {
                     wins: accountsCache[pubKey].wins,
                     losses: accountsCache[pubKey].losses,
                     kills: accountsCache[pubKey].kills,
-                    deaths: accountsCache[pubKey].deaths
+                    deaths: accountsCache[pubKey].deaths,
+                    balance: accountsCache[pubKey].balance
                   };
                 }
                 sock.emit('return_to_lobby', { stats });
@@ -649,14 +900,46 @@ io.on('connection', (socket) => {
   let playerId = socket.id;
 
   // Create room handler
-socket.on('create_room', (mode) => {
+socket.on('create_room', async (data) => {
+  const mode = (data && data.mode) || '1v1';
+  const entryFee = (data && data.entryFee) || 0;
+
+  // Validate entry fee
+  if (!VALID_ENTRY_FEES.includes(entryFee)) {
+    socket.emit('room_error', { message: 'Invalid entry fee' });
+    return;
+  }
+
+  // Check player balance
+  const pubKey = activeSessions[socket.id];
+  if (!pubKey) {
+    socket.emit('room_error', { message: 'Not authenticated' });
+    return;
+  }
+
+  const acc = await getAccount(pubKey);
+  if (!acc || acc.balance < entryFee) {
+    socket.emit('room_error', { message: 'Insufficient balance. Deposit SOL to play!' });
+    return;
+  }
+
+  // Enforce 15-second room creation cooldown
+  const ROOM_CREATE_COOLDOWN = 15000;
+  const lastCreated = roomCreationCooldowns[pubKey] || 0;
+  const elapsed = Date.now() - lastCreated;
+  if (elapsed < ROOM_CREATE_COOLDOWN) {
+    const remaining = Math.ceil((ROOM_CREATE_COOLDOWN - elapsed) / 1000);
+    socket.emit('room_error', { message: `Wait ${remaining}s before creating another room`, cooldownRemaining: remaining });
+    return;
+  }
+
   const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-  rooms[roomId] = createRoom(roomId, playerId, mode || '1v1');
+  rooms[roomId] = createRoom(roomId, playerId, mode, entryFee);
+  roomCreationCooldowns[pubKey] = Date.now();
   io.emit('rooms_updated', getAvailableRooms());
   
   // Auto-join the creator to their room
   socket.emit('room_created', roomId);
-  socket.emit('join_room', roomId);
 });
 
 // Get rooms handler
@@ -664,11 +947,27 @@ socket.on('get_rooms', () => {
   socket.emit('available_rooms', getAvailableRooms());
 });
 
-socket.on('join_room', (roomId) => {
+socket.on('join_room', async (roomId) => {
   if (currentRoom) {
     socket.leave(currentRoom);
     const oldRoom = rooms[currentRoom];
     if (oldRoom) {
+      // Refund entry fee if game hasn't started
+      if (oldRoom.status === 'waiting') {
+        const pubKey = activeSessions[playerId];
+        if (pubKey && oldRoom.paidPlayers[pubKey]) {
+          const refundAmount = oldRoom.paidPlayers[pubKey];
+          const acc = await getAccount(pubKey);
+          if (acc) {
+            acc.balance += refundAmount;
+            accountsCache[pubKey] = acc;
+            await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
+            socket.emit('balance_updated', { balance: acc.balance });
+          }
+          oldRoom.prizePool -= refundAmount;
+          delete oldRoom.paidPlayers[pubKey];
+        }
+      }
       delete oldRoom.players[playerId];
       io.to(currentRoom).emit('player_left', playerId);
       io.emit('rooms_updated', getAvailableRooms());
@@ -676,11 +975,46 @@ socket.on('join_room', (roomId) => {
     delete playerRooms[playerId];
   }
 
-  const room = getRoom(roomId);
+  const room = rooms[roomId];
   if (!room || Object.keys(room.players).length >= room.maxPlayers) {
     socket.emit('join_failed', { message: 'Room is full' });
     return;
   }
+
+  // Check balance and deduct entry fee
+  const pubKey = activeSessions[socket.id];
+  if (!pubKey) {
+    socket.emit('join_failed', { message: 'Not authenticated' });
+    return;
+  }
+
+  const acc = await getAccount(pubKey);
+  if (!acc) {
+    socket.emit('join_failed', { message: 'Account not found' });
+    return;
+  }
+
+  if (acc.balance < room.entryFee) {
+    socket.emit('join_failed', { message: 'Insufficient balance. Deposit SOL to play!' });
+    return;
+  }
+
+  // Deduct entry fee
+  acc.balance -= room.entryFee;
+  accountsCache[pubKey] = acc;
+  room.prizePool += room.entryFee;
+  room.paidPlayers[pubKey] = room.entryFee;
+
+  // Persist balance deduction
+  await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
+  await supabase.from('game_transactions').insert({
+    public_key: pubKey,
+    room_id: roomId,
+    type: 'entry_fee',
+    amount: room.entryFee
+  });
+
+  socket.emit('balance_updated', { balance: acc.balance });
 
   currentRoom = roomId;
   playerRooms[playerId] = roomId;
@@ -697,13 +1031,13 @@ socket.on('join_room', (roomId) => {
   if (isRoomFull || is1v1Ready || is2v2Ready) {
     room.status = 'countdown';
     room.countdownStartTime = Date.now();
-    io.to(roomId).emit('game_countdown_start');
+    io.to(roomId).emit('game_countdown_start', { prizePool: room.prizePool });
     
     // Start the game after 3 seconds
     setTimeout(() => {
       if (rooms[roomId]) {
         rooms[roomId].status = 'active';
-        io.to(roomId).emit('game_start');
+        io.to(roomId).emit('game_start', { prizePool: room.prizePool });
       }
     }, 3000);
   }
@@ -724,10 +1058,12 @@ socket.on('join_room', (roomId) => {
       playerCrouchH: PLAYER_CROUCH_H,
       moveSpeed: MOVE_SPEED,
       gravity: GRAVITY,
-      jumpForce: JUMP_FORCE
+      jumpForce: JUMP_FORCE,
+      entryFee: room.entryFee,
+      prizePool: room.prizePool
     });
 
-    io.to(roomId).emit('player_joined', { id: playerId, team });
+    io.to(roomId).emit('player_joined', { id: playerId, team, prizePool: room.prizePool });
   });
 
   socket.on('player_input', (data) => {
@@ -793,13 +1129,15 @@ socket.on('join_room', (roomId) => {
     const publicKey = activeSessions[socket.id] || 'anonymous';
     const trimmedMsg = message.slice(0, 200);
     
+    let msgId = null;
     // Persist chat message to Supabase
     try {
-      await supabase.from('chat_messages').insert({
+      const { data, error } = await supabase.from('chat_messages').insert({
         public_key: publicKey,
         player_name: playerName,
         message: trimmedMsg
-      });
+      }).select('id').single();
+      if (data) msgId = data.id;
     } catch (e) {
       console.error('Chat persist error:', e);
     }
@@ -808,27 +1146,43 @@ socket.on('join_room', (roomId) => {
     io.emit('chat_message', {
       playerName,
       message: trimmedMsg,
-      publicKey
+      publicKey,
+      msgId
     });
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
+    const pubKey = activeSessions[socket.id];
     delete activeSessions[socket.id];
     let currentRoom = playerRooms[socket.id];
     if (currentRoom && rooms[currentRoom]) {
-      delete rooms[currentRoom].players[playerId];
+      const room = rooms[currentRoom];
+
+      // Refund entry fee if game hasn't started
+      if (room.status === 'waiting' && pubKey && room.paidPlayers[pubKey]) {
+        const refundAmount = room.paidPlayers[pubKey];
+        const acc = await getAccount(pubKey);
+        if (acc) {
+          acc.balance += refundAmount;
+          accountsCache[pubKey] = acc;
+          await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
+        }
+        room.prizePool -= refundAmount;
+        delete room.paidPlayers[pubKey];
+      }
+
+      delete room.players[playerId];
       io.to(currentRoom).emit('player_left', playerId);
 
       // Reset room status if game was in progress
-      const room = rooms[currentRoom];
-      if (room && room.status !== 'waiting') {
+      if (room.status !== 'waiting') {
         room.status = 'waiting';
         room.countdownStartTime = null;
         io.to(currentRoom).emit('game_reset');
       }
 
       // Clean up empty rooms
-      if (Object.keys(rooms[currentRoom].players).length === 0) {
+      if (Object.keys(room.players).length === 0) {
         delete rooms[currentRoom];
       }
 
