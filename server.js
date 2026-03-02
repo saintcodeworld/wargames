@@ -138,7 +138,10 @@ app.post('/api/admin/add-balance', async (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Only serve static files when not on Render (Vercel handles frontend)
+if (!process.env.RENDER) {
+  app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // Expose Supabase config to the client (anon key only, safe for browser)
 app.get('/api/supabase-config', (req, res) => {
