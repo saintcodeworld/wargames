@@ -248,6 +248,10 @@
   </div>
 
   <script>
+    // Game server URL — same as in index.html
+    var GAME_SERVER = window.GAME_SERVER_URL || '';
+    function apiUrl(path) { return GAME_SERVER ? GAME_SERVER + path : path; }
+
     let adminPassword = '';
 
     // Login
@@ -255,7 +259,7 @@
       const pw = document.getElementById('adminPassword').value.trim();
       if (!pw) return showMsg('loginMsg', 'Enter a password', 'error');
 
-      const res = await fetch('/api/admin/login', {
+      const res = await fetch(apiUrl('/api/admin/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw })
@@ -281,7 +285,7 @@
       const query = document.getElementById('searchQuery').value.trim();
       if (!query) return showMsg('searchMsg', 'Enter a public key to search', 'error');
 
-      const res = await fetch('/api/admin/search-user', {
+      const res = await fetch(apiUrl('/api/admin/search-user'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: adminPassword, query })
@@ -338,7 +342,7 @@
       if (!publicKey) return showMsg('addMsg', 'Enter a public key', 'error');
       if (!amount || parseFloat(amount) <= 0) return showMsg('addMsg', 'Enter a valid amount', 'error');
 
-      const res = await fetch('/api/admin/add-balance', {
+      const res = await fetch(apiUrl('/api/admin/add-balance'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: adminPassword, publicKey, amount })
