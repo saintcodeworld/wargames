@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USA vs IRAN: Trench War</title>
+  <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="/favicon-64.png" sizes="64x64">
+  <link rel="icon" type="image/png" href="/favicon-128.png" sizes="128x128">
+  <link rel="icon" type="image/png" href="/favicon-192.png" sizes="192x192">
+  <link rel="icon" type="image/png" href="/favicon.png" sizes="any">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Auth Screen -->
+  <div id="auth-screen">
+    <div class="lobby-title">USA vs IRAN</div>
+    <div class="lobby-subtitle">THE TRENCHES</div>
+    <div class="auth-box">
+      <div class="auth-buttons">
+        <button id="signup-btn" class="action-btn auth-btn">Sign Up</button>
+        <button id="login-btn" class="action-btn auth-btn login-variant">Log In</button>
+      </div>
+      <div id="login-form" class="login-form" style="display:none;">
+        <input type="text" id="login-private-key" class="auth-input" placeholder="Enter your private key...">
+        <button id="login-submit-btn" class="action-btn">SUBMIT</button>
+        <button id="login-cancel-btn" class="auth-cancel-btn">CANCEL</button>
+      </div>
+      <div id="auth-error" class="auth-error"></div>
+    </div>
+  </div>
+
+  <!-- Lobby -->
+  <div id="lobby" style="display:none;">
+    <div class="lobby-title">USA vs IRAN</div>
+    <div class="lobby-subtitle">THE TRENCHES</div>
+
+    <div class="lobby-top-bar">
+      <div class="lobby-user-info">
+        <span id="lobby-username" class="lobby-username"></span>
+      </div>
+      <div class="lobby-top-actions">
+        <button id="account-btn" class="action-btn account-btn-style">ACCOUNT</button>
+      </div>
+    </div>
+    
+    <div class="lobby-box">
+      <div class="mode-select">
+        <div class="mode-option" data-mode="1v1">
+          <div class="mode-title">1 VS 1</div>
+          <div class="mode-desc">COMBAT DUEL</div>
+          <div class="mode-players">2 PLAYERS</div>
+        </div>
+        <div class="mode-option" data-mode="2v2">
+          <div class="mode-title">2 VS 2</div>
+          <div class="mode-desc">SQUAD ASSAULT</div>
+          <div class="mode-players">4 PLAYERS</div>
+        </div>
+      </div>
+
+      <div class="lobby-actions">
+        <button id="refresh-rooms-btn" class="action-btn">SCAN BATTLES</button>
+      </div>
+
+      <div class="rooms-list" id="rooms-list">
+        <div class="rooms-header">
+          <span>ACTIVE BATTLEFIELDS</span>
+          <span class="rooms-count" id="rooms-count">0 ROOMS</span>
+        </div>
+        <div class="rooms-grid" id="rooms-grid">
+          <!-- Rooms will be inserted here -->
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="leaderboard-section">
+        <div class="leaderboard-header">
+          <span>LEADERBOARD (24H)</span>
+          <span class="leaderboard-reward">🏆 1ST PLACE: 2 SOL</span>
+        </div>
+        <div class="leaderboard-grid" id="leaderboard-grid">
+          <!-- Leaderboard rows inserted here -->
+        </div>
+      </div>
+    </div>
+
+    <div class="lobby-teams">
+      <span class="team-label-usa">🇺🇸 UNITED STATES</span>
+      <span style="color:#5a4a2a;font-size:9px;letter-spacing:3px">VS</span>
+      <span class="team-label-iran">🇮🇷 IRAN</span>
+    </div>
+  </div>
+
+  <!-- Account Popup -->
+  <div id="account-popup" class="account-popup" style="display:none;">
+    <div class="account-popup-content">
+      <div class="account-popup-title">ACCOUNT</div>
+      <div class="account-field">
+        <label>PUBLIC KEY</label>
+        <div class="account-key" id="account-public-key"></div>
+      </div>
+      <div class="account-field">
+        <label>PRIVATE KEY</label>
+        <div class="account-key account-private-key" id="account-private-key">Click to reveal</div>
+      </div>
+      <div class="account-stats">
+        <div class="stat-item"><span class="stat-label">WINS</span><span class="stat-value" id="account-wins">0</span></div>
+        <div class="stat-item"><span class="stat-label">LOSSES</span><span class="stat-value" id="account-losses">0</span></div>
+        <div class="stat-item"><span class="stat-label">KILLS</span><span class="stat-value" id="account-kills">0</span></div>
+        <div class="stat-item"><span class="stat-label">DEATHS</span><span class="stat-value" id="account-deaths">0</span></div>
+      </div>
+      <div class="account-popup-actions">
+        <button id="logout-btn" class="action-btn logout-btn">LOGOUT</button>
+        <button id="account-close-btn" class="action-btn">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+    <div id="countdown-overlay" class="countdown-overlay">
+    <div class="countdown-content">
+      <div class="countdown-title">MATCH STARTING</div>
+      <div class="countdown-number" id="countdown-number">3</div>
+    </div>
+  </div>
+
+  <!-- Game -->
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+  </div>
+
+  <!-- CRT Overlay -->
+  <div id="crt-overlay"></div>
+  <div id="vignette"></div>
+
+  <!-- Scoreboard -->
+  <div id="scoreboard">
+    <span class="score-team score-usa">🇺🇸 USA <span class="score-num" id="score-usa">0</span></span>
+    <span class="score-divider">—</span>
+    <span class="score-team score-iran"><span class="score-num" id="score-iran">0</span> IRAN 🇮🇷</span>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <span class="team-badge" id="team-badge">USA</span>
+    <div class="hp-bar-bg"><div class="hp-bar-fill" id="hp-bar"></div></div>
+    <span class="hp-text" id="hp-text">100 HP</span>
+  </div>
+
+  <!-- Kill Feed -->
+  <div id="kill-feed"></div>
+
+  <!-- Respawn Overlay -->
+  <div id="respawn-overlay"><span>YOU DIED — RESPAWNING...</span></div>
+
+  <!-- Round Timer Overlay -->
+  <div id="round-timer-overlay" class="round-timer-overlay">
+    <div class="round-timer-content">
+      <div class="round-winner"></div>
+      <div class="round-scores"></div>
+      <div class="round-timer">NEXT ROUND IN: <span class="round-timer-number">2</span></div>
+    </div>
+  </div>
+
+  <!-- Room Info -->
+  <div id="room-info">ROOM: <span id="room-id-display"></span></div>
+
+  <!-- Controls Info -->
+  <div id="controls-info">
+    <div class="controls-title">CONTROLS</div>
+    <div class="control-item">↑ W - Move Up</div>
+    <div class="control-item">↓ S - Move Down</div>
+    <div class="control-item">← A - Move Left</div>
+    <div class="control-item">→ D - Move Right</div>
+    <div class="control-item">SPACE/F - Shoot</div>
+  </div>
+
+  <!-- Chat Interface -->
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <div class="chat-input-container">
+      <input type="text" id="chat-input" placeholder="Type message..." maxlength="200">
+      <button id="chat-send">SEND</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
