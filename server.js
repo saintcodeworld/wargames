@@ -482,6 +482,7 @@ app.get('/favicon-192.png', (req, res) => {
 
 // ─── Game Constants ───
 const TICK_RATE = 60;
+const TICK_MS = 1000 / TICK_RATE;
 const MAP_WIDTH = 1600;
 const MAP_HEIGHT = 600;
 const GROUND_Y = 420;
@@ -608,9 +609,11 @@ function createPlayer(id, team) {
 }
 
 // ─── Physics Tick ───
-function tickRoom(room) {
+function tickRoom(room, deltaMs) {
   if (room.status === 'match_over') return;
   const now = Date.now();
+  // dt: ratio of actual elapsed time to the ideal tick interval (clamped to avoid spiral-of-death)
+  const dt = Math.min(deltaMs / TICK_MS, 3);
   room.lastTick = now;
 
   // Update players
@@ -646,16 +649,14 @@ function tickRoom(room) {
       p.onGround = false;
     }
 
-    // Gravity
-    p.vy += GRAVITY;
+    // Gravity — scaled by dt
+    p.vy += GRAVITY * dt;
 
-    // Apply velocity
-    p.x += p.vx;
-    p.y += p.vy;
+    // Apply velocity — scaled by dt
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
 
     // Ground collision
-    const groundLevel = GROUND_Y - (p.crouching ? PLAYER_CROUCH_H : PLAYER_H);
-    // If in trench and crouching, player sinks into trench
     const inTrench = isInTrench(p.x + PLAYER_W / 2);
     const effectiveGround = inTrench && p.crouching
       ? GROUND_Y - PLAYER_CROUCH_H + TRENCH_LEFT.depth
@@ -675,7 +676,7 @@ function tickRoom(room) {
   // Update bullets
   for (let i = room.bullets.length - 1; i >= 0; i--) {
     const b = room.bullets[i];
-    b.x += b.vx;
+    b.x += b.vx * dt;
 
     // Off screen
     if (b.x < -20 || b.x > MAP_WIDTH + 20) {
@@ -743,7 +744,8 @@ function tickRoom(room) {
   const state = {
     players: {},
     bullets: room.bullets.map(b => ({ x: b.x, y: b.y, team: b.team })),
-    scores: room.scores
+    scores: room.scores,
+    t: now // server timestamp for client latency measurement
   };
   for (const pid in room.players) {
     const p = room.players[pid];
@@ -1202,6 +1204,11 @@ socket.on('join_room', async (roomId) => {
     delete playerRooms[playerId];
   });
 
+  // Ping/pong for latency measurement
+  socket.on('ping_measure', (clientTimestamp) => {
+    socket.emit('pong_measure', clientTimestamp);
+  });
+
   // Handle return to lobby (reset room tracking after match end)
   socket.on('returned_to_lobby', () => {
     currentRoom = null;
@@ -1282,12 +1289,18 @@ socket.on('join_room', async (roomId) => {
   });
 });
 
-// ─── Game Loop ───
-setInterval(() => {
+// ─── Game Loop (precise setTimeout-based, tracks real delta time) ───
+let _lastLoopTime = Date.now();
+function gameLoop() {
+  const now = Date.now();
+  const deltaMs = now - _lastLoopTime;
+  _lastLoopTime = now;
   for (const roomId in rooms) {
-    tickRoom(rooms[roomId]);
+    tickRoom(rooms[roomId], deltaMs);
   }
-}, 1000 / TICK_RATE);
+  setTimeout(gameLoop, TICK_MS);
+}
+gameLoop();
 
 // ─── Start Server ───
 const PORT = process.env.PORT || 3000;
