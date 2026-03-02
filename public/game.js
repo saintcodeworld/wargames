@@ -560,11 +560,13 @@
 
   // Mode selection — shows entry fee picker
   document.querySelectorAll('.mode-option').forEach(option => {
-    option.addEventListener('click', () => {
+    option.addEventListener('click', async () => {
       if (roomCreateCooldown) return;
       document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
       option.classList.add('selected');
       selectedMode = option.dataset.mode;
+      // Refresh balance from server before showing fee options
+      await fetchBalance();
       // Show entry fee section
       entryFeeSection.style.display = 'block';
       feeError.textContent = '';

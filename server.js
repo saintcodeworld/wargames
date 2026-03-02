@@ -141,14 +141,13 @@ const activeSessions = {}; // { socketId: publicKey }
 
 // Helper: get or create account in Supabase
 async function getAccount(publicKey) {
-  // Check cache first
-  if (accountsCache[publicKey]) return accountsCache[publicKey];
+  // Always fetch fresh balance from DB to pick up admin credits and other external changes
   const { data, error } = await supabase
     .from('accounts')
     .select('*')
     .eq('public_key', publicKey)
     .single();
-  if (error || !data) return null;
+  if (error || !data) return accountsCache[publicKey] || null;
   const acc = {
     publicKey: data.public_key,
     privateKey: data.private_key,
