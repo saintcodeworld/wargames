@@ -19,7 +19,30 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['websocket', 'polling'],
+  allowUpgrades: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  upgradeTimeout: 30000,
+  maxHttpBufferSize: 1e6
+});
+
+// ─── CORS for cross-origin requests (Vercel frontend → Railway game server) ───
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['*'];
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
 });
 
 app.use(express.json());
@@ -131,7 +154,7 @@ const PLATFORM_WALLET = process.env.PLATFORM_WALLET || '';
 const solanaConnection = new Connection(SOLANA_RPC_URL, 'confirmed');
 
 // ─── Entry Fee Options (SOL) ───
-const VALID_ENTRY_FEES = [0.01, 0.05, 0.1, 0.5];
+const VALID_ENTRY_FEES = [0, 0.01, 0.05, 0.1, 0.5];
 const PLATFORM_FEE_PERCENT = 0; // 0% platform fee for now
 const processedSignatures = new Set(); // Track already-credited tx signatures
 
@@ -901,7 +924,7 @@ io.on('connection', (socket) => {
   // Create room handler
 socket.on('create_room', async (data) => {
   const mode = (data && data.mode) || '1v1';
-  const entryFee = (data && data.entryFee) || 0;
+  const entryFee = (data && typeof data.entryFee === 'number') ? data.entryFee : 0;
 
   // Validate entry fee
   if (!VALID_ENTRY_FEES.includes(entryFee)) {
@@ -916,10 +939,13 @@ socket.on('create_room', async (data) => {
     return;
   }
 
-  const acc = await getAccount(pubKey);
-  if (!acc || acc.balance < entryFee) {
-    socket.emit('room_error', { message: 'Insufficient balance. Deposit SOL to play!' });
-    return;
+  // Skip balance check for free rooms
+  if (entryFee > 0) {
+    const acc = await getAccount(pubKey);
+    if (!acc || acc.balance < entryFee) {
+      socket.emit('room_error', { message: 'Insufficient balance. Deposit SOL to play!' });
+      return;
+    }
   }
 
   // Enforce 15-second room creation cooldown
@@ -930,6 +956,23 @@ socket.on('create_room', async (data) => {
     const remaining = Math.ceil((ROOM_CREATE_COOLDOWN - elapsed) / 1000);
     socket.emit('room_error', { message: `Wait ${remaining}s before creating another room`, cooldownRemaining: remaining });
     return;
+  }
+
+  // For free rooms, try to find an existing waiting room with the same mode first
+  if (entryFee === 0) {
+    for (const rid in rooms) {
+      const existingRoom = rooms[rid];
+      if (existingRoom.entryFee === 0 &&
+          existingRoom.mode === mode &&
+          existingRoom.status === 'waiting' &&
+          Object.keys(existingRoom.players).length < existingRoom.maxPlayers &&
+          existingRoom.creatorId !== playerId) {
+        // Found a matching free room — join it instead of creating a new one
+        roomCreationCooldowns[pubKey] = Date.now();
+        socket.emit('room_created', rid);
+        return;
+      }
+    }
   }
 
   const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -993,27 +1036,30 @@ socket.on('join_room', async (roomId) => {
     return;
   }
 
-  if (acc.balance < room.entryFee) {
-    socket.emit('join_failed', { message: 'Insufficient balance. Deposit SOL to play!' });
-    return;
+  // Skip balance check and fee deduction for free rooms
+  if (room.entryFee > 0) {
+    if (acc.balance < room.entryFee) {
+      socket.emit('join_failed', { message: 'Insufficient balance. Deposit SOL to play!' });
+      return;
+    }
+
+    // Deduct entry fee
+    acc.balance -= room.entryFee;
+    accountsCache[pubKey] = acc;
+    room.prizePool += room.entryFee;
+    room.paidPlayers[pubKey] = room.entryFee;
+
+    // Persist balance deduction
+    await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
+    await supabase.from('game_transactions').insert({
+      public_key: pubKey,
+      room_id: roomId,
+      type: 'entry_fee',
+      amount: room.entryFee
+    });
+
+    socket.emit('balance_updated', { balance: acc.balance });
   }
-
-  // Deduct entry fee
-  acc.balance -= room.entryFee;
-  accountsCache[pubKey] = acc;
-  room.prizePool += room.entryFee;
-  room.paidPlayers[pubKey] = room.entryFee;
-
-  // Persist balance deduction
-  await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
-  await supabase.from('game_transactions').insert({
-    public_key: pubKey,
-    room_id: roomId,
-    type: 'entry_fee',
-    amount: room.entryFee
-  });
-
-  socket.emit('balance_updated', { balance: acc.balance });
 
   currentRoom = roomId;
   playerRooms[playerId] = roomId;
@@ -1021,7 +1067,32 @@ socket.on('join_room', async (roomId) => {
   const team = assignTeam(room);
   room.players[playerId] = createPlayer(playerId, team);
 
-  // Check if room is ready to start
+  // Emit joined to the new player first so they set up listeners
+  socket.emit('joined', {
+    id: playerId,
+    team,
+    roomId: roomId,
+    mapWidth: MAP_WIDTH,
+    mapHeight: MAP_HEIGHT,
+    groundY: GROUND_Y,
+    trenchLeft: TRENCH_LEFT,
+    trenchRight: TRENCH_RIGHT,
+    playerW: PLAYER_W,
+    playerH: PLAYER_H,
+    playerCrouchH: PLAYER_CROUCH_H,
+    moveSpeed: MOVE_SPEED,
+    gravity: GRAVITY,
+    jumpForce: JUMP_FORCE,
+    entryFee: room.entryFee,
+    prizePool: room.prizePool,
+    maxPlayers: room.maxPlayers,
+    mode: room.mode,
+    playerCount: Object.keys(room.players).length
+  });
+
+  io.to(roomId).emit('player_joined', { id: playerId, team, prizePool: room.prizePool });
+
+  // Check if room is ready to start (after joined is sent)
   const playerCount = Object.keys(room.players).length;
   const isRoomFull = playerCount === room.maxPlayers;
   const is1v1Ready = room.mode === '1v1' && playerCount === 2;
@@ -1042,27 +1113,6 @@ socket.on('join_room', async (roomId) => {
   }
 
   io.emit('rooms_updated', getAvailableRooms());
-
-    socket.emit('joined', {
-      id: playerId,
-      team,
-      roomId: roomId,
-      mapWidth: MAP_WIDTH,
-      mapHeight: MAP_HEIGHT,
-      groundY: GROUND_Y,
-      trenchLeft: TRENCH_LEFT,
-      trenchRight: TRENCH_RIGHT,
-      playerW: PLAYER_W,
-      playerH: PLAYER_H,
-      playerCrouchH: PLAYER_CROUCH_H,
-      moveSpeed: MOVE_SPEED,
-      gravity: GRAVITY,
-      jumpForce: JUMP_FORCE,
-      entryFee: room.entryFee,
-      prizePool: room.prizePool
-    });
-
-    io.to(roomId).emit('player_joined', { id: playerId, team, prizePool: room.prizePool });
   });
 
   socket.on('player_input', (data) => {
@@ -1108,6 +1158,42 @@ socket.on('join_room', async (roomId) => {
   // Handle player name setting
   socket.on('set_player_name', (name) => {
     socket.playerName = name;
+  });
+
+  // Handle leaving a room from the waiting overlay
+  socket.on('leave_room', async () => {
+    if (!currentRoom || !rooms[currentRoom]) return;
+    const room = rooms[currentRoom];
+
+    // Refund entry fee if game hasn't started
+    if (room.status === 'waiting') {
+      const pubKey = activeSessions[socket.id];
+      if (pubKey && room.paidPlayers[pubKey]) {
+        const refundAmount = room.paidPlayers[pubKey];
+        const acc = await getAccount(pubKey);
+        if (acc) {
+          acc.balance += refundAmount;
+          accountsCache[pubKey] = acc;
+          await supabase.from('accounts').update({ balance: acc.balance }).eq('public_key', pubKey);
+          socket.emit('balance_updated', { balance: acc.balance });
+        }
+        room.prizePool -= refundAmount;
+        delete room.paidPlayers[pubKey];
+      }
+    }
+
+    delete room.players[playerId];
+    socket.leave(currentRoom);
+    io.to(currentRoom).emit('player_left', playerId);
+
+    // Clean up empty rooms
+    if (Object.keys(room.players).length === 0) {
+      delete rooms[currentRoom];
+    }
+
+    io.emit('rooms_updated', getAvailableRooms());
+    currentRoom = null;
+    delete playerRooms[playerId];
   });
 
   // Handle return to lobby (reset room tracking after match end)

@@ -57,6 +57,32 @@
     </div>
     
     <div class="lobby-box">
+      <!-- Free Play Section -->
+      <div class="free-play-section">
+        <div class="free-play-header">
+          <span class="free-play-badge">FREE</span>
+          <span class="free-play-title">FREE PLAY</span>
+          <span class="free-play-subtitle">NO ENTRY FEE — PRACTICE MODE</span>
+        </div>
+        <div class="free-mode-select">
+          <div class="free-mode-option" data-mode="1v1">
+            <div class="free-mode-title">1 VS 1</div>
+            <div class="free-mode-players">2 PLAYERS</div>
+          </div>
+          <div class="free-mode-option" data-mode="2v2">
+            <div class="free-mode-title">2 VS 2</div>
+            <div class="free-mode-players">4 PLAYERS</div>
+          </div>
+        </div>
+        <button id="create-free-room-btn" class="action-btn create-free-room-btn" disabled>PLAY FREE</button>
+        <div id="free-fee-error" class="fee-error"></div>
+      </div>
+
+      <div class="section-divider">
+        <span class="divider-text">OR PLAY FOR SOL</span>
+      </div>
+
+      <!-- Paid Mode Selection -->
       <div class="mode-select">
         <div class="mode-option" data-mode="1v1">
           <div class="mode-title">1 VS 1</div>
@@ -157,6 +183,19 @@
         <button id="logout-btn" class="action-btn logout-btn">LOGOUT</button>
         <button id="account-close-btn" class="action-btn">CLOSE</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Waiting Room Overlay -->
+  <div id="waiting-overlay" class="waiting-overlay" style="display:none;">
+    <div class="waiting-content">
+      <div class="waiting-title">WAITING FOR PLAYERS</div>
+      <div class="waiting-room-id">ROOM: <span id="waiting-room-id"></span></div>
+      <div class="waiting-mode" id="waiting-mode"></div>
+      <div class="waiting-players" id="waiting-players">1 / 2</div>
+      <div class="waiting-dots"><span>.</span><span>.</span><span>.</span></div>
+      <div class="waiting-fee" id="waiting-fee"></div>
+      <button id="waiting-leave-btn" class="action-btn waiting-leave-btn">LEAVE ROOM</button>
     </div>
   </div>
 
@@ -288,8 +327,8 @@
         <div class="hiw-section">
           <div class="hiw-section-title">CREATING / JOINING A MATCH</div>
           <div class="hiw-step">1. Select a game mode: 1v1 (2 players) or 2v2 (4 players).</div>
-          <div class="hiw-step">2. Pick an entry fee (0.01 / 0.05 / 0.1 / 0.5 SOL). The entry fee is deducted from your balance when you join.</div>
-          <div class="hiw-step">3. Click CREATE ROOM, or join an existing room from the ACTIVE BATTLEFIELDS list.</div>
+          <div class="hiw-step">2. Choose FREE PLAY to practice with no entry fee, or pick a SOL entry fee (0.01 / 0.05 / 0.1 / 0.5 SOL) to play for real.</div>
+          <div class="hiw-step">3. Click CREATE FREE ROOM or CREATE ROOM, or join an existing room from the ACTIVE BATTLEFIELDS list.</div>
           <div class="hiw-step">4. Once all player slots are filled, a 3-second countdown starts and the match begins.</div>
         </div>
         <div class="hiw-section">
@@ -326,7 +365,34 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
+  <!-- Socket.IO loaded from game server (Railway). Update this URL after deploying to Railway. -->
+  <script>
+    // SET THIS to your Railway game server URL (e.g. 'https://your-app.up.railway.app')
+    // Leave empty string for local development
+    window.GAME_SERVER_URL = '';
+  </script>
+  <script>
+    // Dynamically load socket.io client from game server
+    (function() {
+      var src = window.GAME_SERVER_URL
+        ? window.GAME_SERVER_URL + '/socket.io/socket.io.js'
+        : '/socket.io/socket.io.js';
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function() {
+        // Load game.js after socket.io is ready
+        var g = document.createElement('script');
+        g.src = 'game.js';
+        document.body.appendChild(g);
+      };
+      s.onerror = function() {
+        console.error('Failed to load socket.io from ' + src);
+        document.body.innerHTML = '<div style="color:white;text-align:center;padding:40px;font-family:monospace;">' +
+          '<h2>CONNECTION ERROR</h2><p>Cannot reach game server at: ' + (window.GAME_SERVER_URL || 'this origin') + '</p>' +
+          '<p>Make sure the game server is running.</p></div>';
+      };
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

@@ -8,12 +8,30 @@
   let chatSubscription = null; // Supabase realtime subscription
   const displayedMessageIds = new Set(); // Dedup chat messages between socket.io and realtime
 
-  const socket = io();
+  // ─── Game Server URL (Railway backend) ───
+  // When deployed: set this to your Railway game server URL (e.g. https://your-app.up.railway.app)
+  // When running locally: leave as empty string to use same origin
+  const GAME_SERVER = window.GAME_SERVER_URL || '';
+
+  const socket = io(GAME_SERVER || undefined, {
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
+  });
+
+  // Helper: build API URL pointing to game server
+  function apiUrl(path) {
+    return GAME_SERVER ? GAME_SERVER + path : path;
+  }
 
   // ─── Supabase Realtime Init ───
   async function initSupabase() {
     try {
-      const res = await fetch('/api/supabase-config');
+      const res = await fetch(apiUrl('/api/supabase-config'));
       const config = await res.json();
       if (config.url && config.anonKey && window.supabase) {
         supabaseClient = window.supabase.createClient(config.url, config.anonKey);
@@ -47,7 +65,7 @@
     const savedKey = localStorage.getItem('trenches_private_key');
     if (!savedKey) return false;
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ privateKey: savedKey })
@@ -69,7 +87,7 @@
   // Load chat history from Supabase
   async function loadChatHistory() {
     try {
-      const res = await fetch('/api/chat/recent');
+      const res = await fetch(apiUrl('/api/chat/recent'));
       const messages = await res.json();
       messages.forEach(m => {
         addChatMessage(m.playerName, m.message, m.id);
@@ -110,16 +128,27 @@
   const prizePoolHud = document.getElementById('prize-pool-hud');
   const prizePoolAmount = document.getElementById('prize-pool-amount');
   const accountBalance = document.getElementById('account-balance');
+  const createFreeRoomBtn = document.getElementById('create-free-room-btn');
+  const freeFeeError = document.getElementById('free-fee-error');
+  const waitingOverlay = document.getElementById('waiting-overlay');
+  const waitingRoomId = document.getElementById('waiting-room-id');
+  const waitingMode = document.getElementById('waiting-mode');
+  const waitingPlayers = document.getElementById('waiting-players');
+  const waitingFee = document.getElementById('waiting-fee');
+  const waitingLeaveBtn = document.getElementById('waiting-leave-btn');
 
   let playerBalance = 0;
   let selectedEntryFee = null;
   let currentPrizePool = 0;
+  let selectedFreeMode = null;
+  let currentRoomMaxPlayers = 2;
+  let currentRoomPlayerCount = 0;
 
   // ─── Auth Handlers ───
   signupBtn.addEventListener('click', async () => {
     authError.textContent = '';
     try {
-      const res = await fetch('/api/signup', { method: 'POST' });
+      const res = await fetch(apiUrl('/api/signup'), { method: 'POST' });
       const data = await res.json();
       if (data.error) { authError.textContent = data.error; return; }
       currentAccount = data;
@@ -144,7 +173,7 @@
     const pk = loginPrivateKeyInput.value.trim();
     if (!pk) { authError.textContent = 'Enter your private key'; return; }
     try {
-      const res = await fetch('/api/login', {
+      const res = await fetch(apiUrl('/api/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ privateKey: pk })
@@ -166,13 +195,14 @@
     fetchLeaderboard();
     loadChatHistory();
     fetchBalance();
+    socket.emit('get_rooms');
   }
 
   // ─── Balance Management ───
   async function fetchBalance() {
     if (!currentAccount) return;
     try {
-      const res = await fetch('/api/balance/' + currentAccount.publicKey);
+      const res = await fetch(apiUrl('/api/balance/' + currentAccount.publicKey));
       const data = await res.json();
       playerBalance = data.balance || 0;
       updateBalanceDisplay();
@@ -210,7 +240,7 @@
     accountPrivateKey.classList.remove('revealed');
     // Fetch latest stats
     try {
-      const res = await fetch('/api/account/' + currentAccount.publicKey);
+      const res = await fetch(apiUrl('/api/account/' + currentAccount.publicKey));
       const data = await res.json();
       accountWins.textContent = data.wins || 0;
       accountLosses.textContent = data.losses || 0;
@@ -239,7 +269,7 @@
   // Fetch platform wallet on load
   async function fetchPlatformWallet() {
     try {
-      const res = await fetch('/api/platform-wallet');
+      const res = await fetch(apiUrl('/api/platform-wallet'));
       const data = await res.json();
       if (data.wallet) platformWallet = data.wallet;
     } catch (e) {}
@@ -310,7 +340,7 @@
     depositVerifyBtn.disabled = true;
 
     try {
-      const res = await fetch('/api/verify-deposit', {
+      const res = await fetch(apiUrl('/api/verify-deposit'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -386,7 +416,7 @@
   // ─── Leaderboard ───
   async function fetchLeaderboard() {
     try {
-      const res = await fetch('/api/leaderboard');
+      const res = await fetch(apiUrl('/api/leaderboard'));
       const data = await res.json();
       renderLeaderboard(data);
     } catch (e) {}
@@ -526,15 +556,25 @@
     roomCreateCooldown = true;
     let remaining = seconds;
     const modeOptions = document.querySelectorAll('.mode-option');
+    const freeModeOptions = document.querySelectorAll('.free-mode-option');
     modeOptions.forEach(opt => {
       opt.classList.add('cooldown-disabled');
       const title = opt.querySelector('.mode-title');
+      if (title) title.dataset.originalText = title.textContent;
+    });
+    freeModeOptions.forEach(opt => {
+      opt.classList.add('cooldown-disabled');
+      const title = opt.querySelector('.free-mode-title');
       if (title) title.dataset.originalText = title.textContent;
     });
 
     function updateCooldownText() {
       modeOptions.forEach(opt => {
         const title = opt.querySelector('.mode-title');
+        if (title) title.textContent = `${title.dataset.originalText} (${remaining}s)`;
+      });
+      freeModeOptions.forEach(opt => {
+        const title = opt.querySelector('.free-mode-title');
         if (title) title.textContent = `${title.dataset.originalText} (${remaining}s)`;
       });
     }
@@ -552,11 +592,36 @@
           const title = opt.querySelector('.mode-title');
           if (title) title.textContent = title.dataset.originalText;
         });
+        freeModeOptions.forEach(opt => {
+          opt.classList.remove('cooldown-disabled');
+          const title = opt.querySelector('.free-mode-title');
+          if (title) title.textContent = title.dataset.originalText;
+        });
       } else {
         updateCooldownText();
       }
     }, 1000);
   }
+
+  // Free mode selection
+  document.querySelectorAll('.free-mode-option').forEach(option => {
+    option.addEventListener('click', () => {
+      if (roomCreateCooldown) return;
+      document.querySelectorAll('.free-mode-option').forEach(opt => opt.classList.remove('selected'));
+      option.classList.add('selected');
+      selectedFreeMode = option.dataset.mode;
+      createFreeRoomBtn.disabled = false;
+      freeFeeError.textContent = '';
+    });
+  });
+
+  // Create free room button
+  createFreeRoomBtn.addEventListener('click', () => {
+    if (!selectedFreeMode) return;
+    if (roomCreateCooldown) return;
+    freeFeeError.textContent = '';
+    socket.emit('create_room', { mode: selectedFreeMode, entryFee: 0 });
+  });
 
   // Mode selection — shows entry fee picker
   document.querySelectorAll('.mode-option').forEach(option => {
@@ -615,14 +680,18 @@
     rooms.forEach(room => {
       const roomEl = document.createElement('div');
       roomEl.className = 'room-item';
+      const isFree = !room.entryFee || room.entryFee === 0;
       roomEl.dataset.mode = room.mode.toUpperCase();
-      const canAfford = playerBalance >= (room.entryFee || 0);
+      if (isFree) roomEl.classList.add('room-free');
+      const canAfford = isFree || playerBalance >= room.entryFee;
+      const feeDisplay = isFree ? 'FREE' : `${room.entryFee} SOL ENTRY`;
+      const prizeDisplay = isFree ? 'NO PRIZE POOL' : `Prize Pool: ${room.prizePool || 0} SOL`;
       roomEl.innerHTML = `
         <div class="room-info">
-          <div class="room-id">${room.id}</div>
+          <div class="room-id">${room.id}${isFree ? ' <span class="room-free-badge">FREE</span>' : ''}</div>
           <div class="room-status">${room.status.toUpperCase()}</div>
-          <div class="room-fee">${room.entryFee || 0} SOL ENTRY</div>
-          <div class="room-prize">Prize Pool: ${room.prizePool || 0} SOL</div>
+          <div class="room-fee">${feeDisplay}</div>
+          <div class="room-prize">${prizeDisplay}</div>
         </div>
         <div class="room-players">${room.playerCount}/${room.maxPlayers}</div>
       `;
@@ -646,6 +715,13 @@
   // Initial rooms fetch
   socket.emit('get_rooms');
 
+  // Auto-refresh rooms list every 5 seconds so players always see available rooms
+  setInterval(() => {
+    if (waitingOverlay.style.display === 'none' || waitingOverlay.style.display === '') {
+      socket.emit('get_rooms');
+    }
+  }, 5000);
+
   socket.on('available_rooms', (rooms) => {
     updateRoomsList(rooms);
   });
@@ -655,6 +731,7 @@
   });
 
   socket.on('join_failed', (data) => {
+    waitingOverlay.style.display = 'none';
     alert(data.message);
   });
 
@@ -665,6 +742,10 @@
     // Reset the entry fee UI
     entryFeeSection.style.display = 'none';
     document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('selected'));
+    // Reset free mode UI
+    document.querySelectorAll('.free-mode-option').forEach(opt => opt.classList.remove('selected'));
+    createFreeRoomBtn.disabled = true;
+    selectedFreeMode = null;
   });
 
   socket.on('room_error', (data) => {
@@ -672,6 +753,7 @@
       startRoomCooldown(data.cooldownRemaining);
     }
     feeError.textContent = data.message || 'Error creating room';
+    freeFeeError.textContent = data.message || 'Error creating room';
   });
 
   socket.on('balance_updated', (data) => {
@@ -683,6 +765,8 @@
     if (data && data.prizePool !== undefined) {
       currentPrizePool = data.prizePool;
     }
+    // Hide waiting overlay when countdown starts
+    waitingOverlay.style.display = 'none';
     countdownOverlay.style.display = 'flex';
     countdownOverlay.style.opacity = '1';
     let count = 3;
@@ -746,7 +830,7 @@
       payoutEl.className = 'match-payout';
       payoutEl.textContent = `YOU WON +${data.payoutPerWinner.toFixed(4)} SOL!`;
       roundTimerOverlay.querySelector('.round-timer-content').appendChild(payoutEl);
-    } else if (data.winner !== myTeam) {
+    } else if (data.winner !== myTeam && data.prizePool > 0) {
       const lostEl = document.createElement('div');
       lostEl.className = 'match-prize-info';
       lostEl.style.color = '#c0392b';
@@ -770,6 +854,8 @@
     document.getElementById('hud').style.display = 'none';
     document.getElementById('room-info').style.display = 'none';
     prizePoolHud.style.display = 'none';
+    waitingOverlay.style.display = 'none';
+    socket.removeAllListeners('game_start');
     document.body.classList.remove('in-game');
     showLobbyUI();
     joined = false;
@@ -830,6 +916,8 @@
     document.getElementById('hud').style.display = 'none';
     document.getElementById('room-info').style.display = 'none';
     prizePoolHud.style.display = 'none';
+    waitingOverlay.style.display = 'none';
+    socket.removeAllListeners('game_start');
     document.body.classList.remove('in-game'); // Remove game class
     showLobbyUI(); // Show chat and hide controls
     fetchLeaderboard(); // Refresh leaderboard on return to lobby
@@ -837,21 +925,66 @@
     joined = false;
   });
 
+  // Update waiting overlay when players join/leave
+  socket.on('player_joined', (data) => {
+    if (waitingOverlay.style.display !== 'none') {
+      currentRoomPlayerCount++;
+      waitingPlayers.textContent = currentRoomPlayerCount + ' / ' + currentRoomMaxPlayers;
+    }
+  });
+
+  socket.on('player_left', (leftPlayerId) => {
+    if (waitingOverlay.style.display !== 'none') {
+      currentRoomPlayerCount = Math.max(0, currentRoomPlayerCount - 1);
+      waitingPlayers.textContent = currentRoomPlayerCount + ' / ' + currentRoomMaxPlayers;
+    }
+  });
+
+  // Leave room from waiting overlay
+  waitingLeaveBtn.addEventListener('click', () => {
+    socket.emit('leave_room');
+    waitingOverlay.style.display = 'none';
+    socket.removeAllListeners('game_start');
+  });
+
   socket.on('joined', (data) => {
     myId = data.id;
     myTeam = data.team;
     config = data;
     if (data.prizePool !== undefined) currentPrizePool = data.prizePool;
-    socket.on('game_start', (startData) => {
+
+    // Show waiting overlay
+    currentRoomMaxPlayers = data.maxPlayers || (data.mode === '2v2' ? 4 : 2);
+    currentRoomPlayerCount = data.playerCount || 1;
+    waitingRoomId.textContent = data.roomId || '';
+    const modeLabel = currentRoomMaxPlayers === 4 ? '2 VS 2 — SQUAD ASSAULT' : '1 VS 1 — COMBAT DUEL';
+    waitingMode.textContent = modeLabel;
+    waitingPlayers.textContent = currentRoomPlayerCount + ' / ' + currentRoomMaxPlayers;
+    const isFreeRoom = !data.entryFee || data.entryFee === 0;
+    if (isFreeRoom) {
+      waitingFee.textContent = 'FREE PLAY — NO ENTRY FEE';
+      waitingFee.className = 'waiting-fee free';
+    } else {
+      waitingFee.textContent = data.entryFee + ' SOL ENTRY';
+      waitingFee.className = 'waiting-fee';
+    }
+    waitingOverlay.style.display = 'flex';
+
+    socket.once('game_start', (startData) => {
       if (startData && startData.prizePool !== undefined) currentPrizePool = startData.prizePool;
+      waitingOverlay.style.display = 'none';
       document.getElementById('lobby').style.display = 'none';
       document.getElementById('game-container').style.display = 'block';
       document.getElementById('scoreboard').style.display = 'flex';
       document.getElementById('hud').style.display = 'flex';
       document.getElementById('room-info').style.display = 'block';
-      // Show prize pool HUD
-      prizePoolHud.style.display = 'flex';
-      prizePoolAmount.textContent = currentPrizePool.toFixed(2);
+      // Show prize pool HUD only for paid rooms
+      if (config.entryFee && config.entryFee > 0) {
+        prizePoolHud.style.display = 'flex';
+        prizePoolAmount.textContent = currentPrizePool.toFixed(2);
+      } else {
+        prizePoolHud.style.display = 'none';
+      }
       document.body.classList.add('in-game'); // Add class for CSS targeting
       showGameUI(); // This will hide chat and show controls
       // Force hide chat directly as backup
