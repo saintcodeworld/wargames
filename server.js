@@ -461,6 +461,24 @@ app.get('/api/chat/recent', async (req, res) => {
   }
 });
 
+// Admin: Clear all chat messages
+app.post('/api/admin/clear-chat', async (req, res) => {
+  const { password } = req.body;
+  if (password !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .neq('id', 0); // delete all rows
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to clear chat' });
+  }
+});
+
 // Serve favicon from root
 app.get('/favicon.png', (req, res) => {
   res.sendFile(path.join(__dirname, 'favicon.png'));

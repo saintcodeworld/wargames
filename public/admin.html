@@ -243,6 +243,14 @@
         <div id="addMsg" class="msg"></div>
       </div>
 
+      <!-- Clear Chat -->
+      <div class="card">
+        <h2>🧹 Clear Chat Messages</h2>
+        <p style="font-size:0.85rem;color:#888;margin-bottom:14px;">Delete all chat messages from the lobby. This cannot be undone.</p>
+        <button onclick="clearChat()" style="background:#cc8800;">Clear All Chat</button>
+        <div id="clearChatMsg" class="msg"></div>
+      </div>
+
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
   </div>
@@ -354,6 +362,22 @@
         document.getElementById('addAmount').value = '';
       } else {
         showMsg('addMsg', data.error || 'Failed to add balance', 'error');
+      }
+    }
+
+    // Clear chat
+    async function clearChat() {
+      if (!confirm('Are you sure you want to delete ALL chat messages?')) return;
+      const res = await fetch(apiUrl('/api/admin/clear-chat'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showMsg('clearChatMsg', 'All chat messages cleared!', 'success');
+      } else {
+        showMsg('clearChatMsg', data.error || 'Failed to clear chat', 'error');
       }
     }
 
