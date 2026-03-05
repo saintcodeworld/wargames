@@ -138,10 +138,7 @@ app.post('/api/admin/add-balance', async (req, res) => {
   }
 });
 
-// Always serve socket.io client library (Vercel frontend needs to load it from Render)
-app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist')));
-
-// Serve other static files only when not on Render (Vercel handles the frontend)
+// Only serve static files when not on Render (Vercel handles frontend)
 if (!process.env.RENDER) {
   app.use(express.static(path.join(__dirname, 'public')));
 }
@@ -215,25 +212,34 @@ app.post('/api/signup', async (req, res) => {
     const publicKey = keypair.publicKey.toBase58();
     const privateKey = bs58.default.encode(keypair.secretKey);
 
-    const { error } = await supabase
+    console.log('Attempting signup for:', publicKey);
+
+    const { data, error } = await supabase
       .from('accounts')
       .insert({
         public_key: publicKey,
         private_key: privateKey,
-        wins: 0, losses: 0, kills: 0, deaths: 0,
+        balance: 0,
+        wins: 0, 
+        losses: 0, 
+        kills: 0, 
+        deaths: 0,
         last_active: new Date().toISOString()
-      });
+      })
+      .select()
+      .single();
 
     if (error) {
-      console.error('Signup DB error:', error);
-      return res.status(500).json({ error: 'Signup failed' });
+      console.error('Signup DB error:', error.message, error.details, error.hint);
+      return res.status(500).json({ error: `Signup failed: ${error.message}` });
     }
 
+    console.log('Signup successful:', publicKey);
     accountsCache[publicKey] = { publicKey, privateKey, wins: 0, losses: 0, kills: 0, deaths: 0, balance: 0, lastActive: Date.now() };
     res.json({ publicKey, privateKey });
   } catch (e) {
-    console.error('Signup error:', e);
-    res.status(500).json({ error: 'Signup failed' });
+    console.error('Signup error:', e.message, e.stack);
+    res.status(500).json({ error: `Signup failed: ${e.message}` });
   }
 });
 
@@ -500,7 +506,6 @@ app.get('/favicon-192.png', (req, res) => {
 
 // ─── Game Constants ───
 const TICK_RATE = 60;
-const TICK_MS = 1000 / TICK_RATE;
 const MAP_WIDTH = 1600;
 const MAP_HEIGHT = 600;
 const GROUND_Y = 420;
@@ -627,11 +632,9 @@ function createPlayer(id, team) {
 }
 
 // ─── Physics Tick ───
-function tickRoom(room, deltaMs) {
+function tickRoom(room) {
   if (room.status === 'match_over') return;
   const now = Date.now();
-  // dt: ratio of actual elapsed time to the ideal tick interval (clamped to avoid spiral-of-death)
-  const dt = Math.min(deltaMs / TICK_MS, 3);
   room.lastTick = now;
 
   // Update players
@@ -667,14 +670,16 @@ function tickRoom(room, deltaMs) {
       p.onGround = false;
     }
 
-    // Gravity — scaled by dt
-    p.vy += GRAVITY * dt;
+    // Gravity
+    p.vy += GRAVITY;
 
-    // Apply velocity — scaled by dt
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
+    // Apply velocity
+    p.x += p.vx;
+    p.y += p.vy;
 
     // Ground collision
+    const groundLevel = GROUND_Y - (p.crouching ? PLAYER_CROUCH_H : PLAYER_H);
+    // If in trench and crouching, player sinks into trench
     const inTrench = isInTrench(p.x + PLAYER_W / 2);
     const effectiveGround = inTrench && p.crouching
       ? GROUND_Y - PLAYER_CROUCH_H + TRENCH_LEFT.depth
@@ -694,7 +699,7 @@ function tickRoom(room, deltaMs) {
   // Update bullets
   for (let i = room.bullets.length - 1; i >= 0; i--) {
     const b = room.bullets[i];
-    b.x += b.vx * dt;
+    b.x += b.vx;
 
     // Off screen
     if (b.x < -20 || b.x > MAP_WIDTH + 20) {
@@ -762,8 +767,7 @@ function tickRoom(room, deltaMs) {
   const state = {
     players: {},
     bullets: room.bullets.map(b => ({ x: b.x, y: b.y, team: b.team })),
-    scores: room.scores,
-    t: now // server timestamp for client latency measurement
+    scores: room.scores
   };
   for (const pid in room.players) {
     const p = room.players[pid];
@@ -1222,11 +1226,6 @@ socket.on('join_room', async (roomId) => {
     delete playerRooms[playerId];
   });
 
-  // Ping/pong for latency measurement
-  socket.on('ping_measure', (clientTimestamp) => {
-    socket.emit('pong_measure', clientTimestamp);
-  });
-
   // Handle return to lobby (reset room tracking after match end)
   socket.on('returned_to_lobby', () => {
     currentRoom = null;
@@ -1307,18 +1306,12 @@ socket.on('join_room', async (roomId) => {
   });
 });
 
-// ─── Game Loop (precise setTimeout-based, tracks real delta time) ───
-let _lastLoopTime = Date.now();
-function gameLoop() {
-  const now = Date.now();
-  const deltaMs = now - _lastLoopTime;
-  _lastLoopTime = now;
+// ─── Game Loop ───
+setInterval(() => {
   for (const roomId in rooms) {
-    tickRoom(rooms[roomId], deltaMs);
+    tickRoom(rooms[roomId]);
   }
-  setTimeout(gameLoop, TICK_MS);
-}
-gameLoop();
+}, 1000 / TICK_RATE);
 
 // ─── Start Server ───
 const PORT = process.env.PORT || 3000;

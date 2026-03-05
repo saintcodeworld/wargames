@@ -150,11 +150,23 @@
     try {
       const res = await fetch(apiUrl('/api/signup'), { method: 'POST' });
       const data = await res.json();
-      if (data.error) { authError.textContent = data.error; return; }
+      if (data.error) { 
+        authError.textContent = data.error; 
+        console.error('Signup error:', data.error);
+        return; 
+      }
+      if (!res.ok) {
+        authError.textContent = 'Signup failed: Server error';
+        console.error('Signup failed with status:', res.status);
+        return;
+      }
       currentAccount = data;
       localStorage.setItem('trenches_private_key', data.privateKey);
       onAuthSuccess();
-    } catch (e) { authError.textContent = 'Signup failed'; }
+    } catch (e) { 
+      authError.textContent = `Signup failed: ${e.message}`; 
+      console.error('Signup exception:', e);
+    }
   });
 
   loginBtn.addEventListener('click', () => {
