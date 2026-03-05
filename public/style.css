@@ -7,10 +7,10 @@
 }
 
 body {
-  background: #0a0a0a;
+  background: linear-gradient(135deg, #1a0d2e 0%, #16213e 50%, #0f3460 100%);
   overflow: hidden;
   font-family: 'Press Start 2P', monospace;
-  color: #e0e0e0;
+  color: #e8f4fd;
   height: 100vh;
   width: 100vw;
 }
@@ -22,7 +22,7 @@ body {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(180deg, #1a1510 0%, #2a1f14 40%, #1c2a1a 100%);
+  background: linear-gradient(180deg, #0f1419 0%, #1a2332 40%, #162447 100%);
   position: relative;
   z-index: 100;
 }
@@ -56,8 +56,8 @@ body {
 .lobby-title {
   font-family: 'Black Ops One', 'Press Start 2P', monospace;
   font-size: 36px;
-  color: #d4a84b;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(212,168,75,0.3);
+  color: #4fc3f7;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 20px rgba(79,195,247,0.4);
   margin-bottom: 4px;
   text-align: center;
   letter-spacing: 4px;
@@ -65,11 +65,11 @@ body {
 }
 
 #auth-screen .lobby-title {
-  color: #88bb99;
+  color: #64b5f6;
   text-shadow: 
     0 3px 6px rgba(0,0,0,0.9),
-    0 0 30px rgba(100,180,140,0.3),
-    0 0 10px rgba(100,180,140,0.2);
+    0 0 30px rgba(100,181,246,0.4),
+    0 0 10px rgba(100,181,246,0.3);
   -webkit-text-stroke: 1px rgba(0,0,0,0.5);
   letter-spacing: 6px;
 }
@@ -77,32 +77,32 @@ body {
 .lobby-subtitle {
   font-family: 'Black Ops One', 'Press Start 2P', monospace;
   font-size: 14px;
-  color: #c0392b;
-  text-shadow: 0 2px 8px rgba(192,57,43,0.5), 0 0 20px rgba(192,57,43,0.2);
+  color: #f06292;
+  text-shadow: 0 2px 8px rgba(240,98,146,0.5), 0 0 20px rgba(240,98,146,0.3);
   margin-bottom: 50px;
   letter-spacing: 8px;
 }
 
 #auth-screen .lobby-subtitle {
-  color: #ff6644;
+  color: #e91e63;
   text-shadow: 
     0 2px 6px rgba(0,0,0,0.9),
-    0 0 25px rgba(255,100,70,0.4),
-    0 0 10px rgba(255,100,70,0.3);
+    0 0 25px rgba(233,30,99,0.4),
+    0 0 10px rgba(233,30,99,0.3);
   letter-spacing: 10px;
   margin-bottom: 60px;
 }
 
 .lobby-box {
-  background: rgba(20, 15, 10, 0.85);
-  border: 2px solid #5a4a2a;
-  border-top: 3px solid #8a7a50;
+  background: rgba(15, 20, 35, 0.85);
+  border: 2px solid #2a3f5f;
+  border-top: 3px solid #4a6fa5;
   border-radius: 2px;
   padding: 30px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  box-shadow: 0 4px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+  box-shadow: 0 4px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(79,195,247,0.08);
   min-width: 400px;
   max-height: 70vh;
   overflow-y: auto;
@@ -135,8 +135,8 @@ body {
 
 .mode-option {
   flex: 1;
-  background: linear-gradient(180deg, rgba(90,74,42,0.2) 0%, rgba(40,30,15,0.3) 100%);
-  border: 2px solid #5a4a2a;
+  background: linear-gradient(180deg, rgba(42,74,90,0.2) 0%, rgba(15,30,40,0.3) 100%);
+  border: 2px solid #2a4a5a;
   padding: 20px;
   text-align: center;
   cursor: pointer;
@@ -151,12 +151,12 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(212,168,75,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(79,195,247,0.4), transparent);
 }
 
 .mode-option:hover {
-  background: linear-gradient(180deg, rgba(90,74,42,0.35) 0%, rgba(40,30,15,0.4) 100%);
-  border-color: #8a7a50;
+  background: linear-gradient(180deg, rgba(42,74,90,0.35) 0%, rgba(15,30,40,0.4) 100%);
+  border-color: #5a7a8a;
   transform: scale(1.02);
 }
 
@@ -176,7 +176,7 @@ body {
 .mode-title {
   font-family: 'Black Ops One', 'Press Start 2P', monospace;
   font-size: 20px;
-  color: #d4a84b;
+  color: #4fc3f7;
   margin-bottom: 8px;
   text-shadow: 0 2px 4px rgba(0,0,0,0.6);
 }
@@ -202,10 +202,10 @@ body {
 }
 
 .action-btn {
-  background: linear-gradient(180deg, #c0392b 0%, #962d22 100%);
+  background: linear-gradient(180deg, #1976d2 0%, #1565c0 100%);
   color: #fff;
-  border: 1px solid #e74c3c;
-  border-bottom: 3px solid #7a2019;
+  border: 1px solid #2196f3;
+  border-bottom: 3px solid #0d47a1;
   font-family: 'Press Start 2P', monospace;
   font-size: 11px;
   padding: 12px 24px;
@@ -216,10 +216,10 @@ body {
 }
 
 .action-btn:hover {
-  background: linear-gradient(180deg, #d44637 0%, #a83328 100%);
-  box-shadow: 0 0 20px rgba(192,57,43,0.4);
+  background: linear-gradient(180deg, #2196f3 0%, #1976d2 100%);
+  box-shadow: 0 0 20px rgba(33,150,243,0.4);
   transform: scale(1.05);
-  border-color: #ff6b5a;
+  border-color: #64b5f6;
 }
 
 .action-divider {
@@ -806,7 +806,7 @@ body.in-game #chat-container {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(180deg, #0a0e0d 0%, #1a1f1e 30%, #0d1612 60%, #050807 100%);
+  background: linear-gradient(180deg, #0d1421 0%, #1e2a3a 30%, #12203b 60%, #070b15 100%);
   position: relative;
   z-index: 100;
   overflow: hidden;
@@ -843,10 +843,10 @@ body.in-game #chat-container {
 }
 
 .auth-box {
-  background: linear-gradient(135deg, rgba(15, 20, 18, 0.95) 0%, rgba(10, 15, 12, 0.98) 100%);
-  border: 2px solid #2a3a32;
-  border-left: 3px solid #3d5547;
-  border-top: 1px solid #4a5f52;
+  background: linear-gradient(135deg, rgba(18, 20, 35, 0.95) 0%, rgba(12, 15, 30, 0.98) 100%);
+  border: 2px solid #2a3a52;
+  border-left: 3px solid #3d4767;
+  border-top: 1px solid #4a5f82;
   border-radius: 0;
   padding: 50px 45px;
   display: flex;
@@ -855,7 +855,7 @@ body.in-game #chat-container {
   box-shadow: 
     0 8px 40px rgba(0,0,0,0.8),
     0 2px 8px rgba(0,0,0,0.5),
-    inset 0 1px 0 rgba(100,140,110,0.08),
+    inset 0 1px 0 rgba(100,140,200,0.08),
     inset 0 -1px 0 rgba(0,0,0,0.6);
   min-width: 400px;
   align-items: center;
@@ -2002,20 +2002,20 @@ body.in-game #chat-container {
   justify-content: center;
   width: 42px;
   height: 42px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid #5a4a2a;
+  background: rgba(79, 195, 247, 0.12);
+  border: 1px solid #2a4a5a;
   border-radius: 50%;
-  color: #e0e0e0;
+  color: #e8f4fd;
   text-decoration: none;
   transition: all 0.2s;
   margin-top: 16px;
 }
 
 .x-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #d4a84b;
+  background: rgba(79, 195, 247, 0.25);
+  border-color: #4fc3f7;
   color: #fff;
-  box-shadow: 0 0 14px rgba(212, 168, 75, 0.3);
+  box-shadow: 0 0 14px rgba(79, 195, 247, 0.4);
   transform: scale(1.1);
 }
 
