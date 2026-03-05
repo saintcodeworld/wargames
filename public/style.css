@@ -64,6 +64,16 @@ body {
   -webkit-text-stroke: 1px rgba(0,0,0,0.3);
 }
 
+#auth-screen .lobby-title {
+  color: #88bb99;
+  text-shadow: 
+    0 3px 6px rgba(0,0,0,0.9),
+    0 0 30px rgba(100,180,140,0.3),
+    0 0 10px rgba(100,180,140,0.2);
+  -webkit-text-stroke: 1px rgba(0,0,0,0.5);
+  letter-spacing: 6px;
+}
+
 .lobby-subtitle {
   font-family: 'Black Ops One', 'Press Start 2P', monospace;
   font-size: 14px;
@@ -71,6 +81,16 @@ body {
   text-shadow: 0 2px 8px rgba(192,57,43,0.5), 0 0 20px rgba(192,57,43,0.2);
   margin-bottom: 50px;
   letter-spacing: 8px;
+}
+
+#auth-screen .lobby-subtitle {
+  color: #ff6644;
+  text-shadow: 
+    0 2px 6px rgba(0,0,0,0.9),
+    0 0 25px rgba(255,100,70,0.4),
+    0 0 10px rgba(255,100,70,0.3);
+  letter-spacing: 10px;
+  margin-bottom: 60px;
 }
 
 .lobby-box {
@@ -779,16 +799,17 @@ body.in-game #chat-container {
   display: none !important;
 }
 
-/* ─── Auth Screen ─── */
+/* ─── Auth Screen (Military/War Theme) ─── */
 #auth-screen {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(180deg, #1a1510 0%, #2a1f14 40%, #1c2a1a 100%);
+  background: linear-gradient(180deg, #0a0e0d 0%, #1a1f1e 30%, #0d1612 60%, #050807 100%);
   position: relative;
   z-index: 100;
+  overflow: hidden;
 }
 
 #auth-screen::before {
@@ -796,9 +817,10 @@ body.in-game #chat-container {
   position: absolute;
   inset: 0;
   background:
-    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23n)" opacity="0.06"/></svg>')
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="5" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23n)" opacity="0.12"/></svg>')
     repeat,
-    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.08) 3px, rgba(0,0,0,0.08) 4px);
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px),
+    repeating-linear-gradient(90deg, transparent, transparent 100px, rgba(20,40,30,0.03) 100px, rgba(20,40,30,0.03) 101px);
   pointer-events: none;
   z-index: 1;
 }
@@ -807,7 +829,10 @@ body.in-game #chat-container {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 30%, rgba(180,140,60,0.08) 0%, transparent 70%);
+  background: 
+    radial-gradient(ellipse at 50% 20%, rgba(60,100,70,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(100,60,40,0.05) 0%, transparent 40%),
+    linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.4) 100%);
   pointer-events: none;
   z-index: 1;
 }
@@ -818,18 +843,55 @@ body.in-game #chat-container {
 }
 
 .auth-box {
-  background: rgba(20, 15, 10, 0.85);
-  border: 2px solid #5a4a2a;
-  border-top: 3px solid #8a7a50;
-  border-radius: 2px;
-  padding: 40px;
+  background: linear-gradient(135deg, rgba(15, 20, 18, 0.95) 0%, rgba(10, 15, 12, 0.98) 100%);
+  border: 2px solid #2a3a32;
+  border-left: 3px solid #3d5547;
+  border-top: 1px solid #4a5f52;
+  border-radius: 0;
+  padding: 50px 45px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  box-shadow: 0 4px 30px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
-  min-width: 360px;
+  gap: 24px;
+  box-shadow: 
+    0 8px 40px rgba(0,0,0,0.8),
+    0 2px 8px rgba(0,0,0,0.5),
+    inset 0 1px 0 rgba(100,140,110,0.08),
+    inset 0 -1px 0 rgba(0,0,0,0.6);
+  min-width: 400px;
   align-items: center;
   margin-top: 40px;
+  position: relative;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    12px 100%,
+    0 calc(100% - 12px)
+  );
+}
+
+.auth-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #5a7a62, transparent);
+  opacity: 0.6;
+}
+
+.auth-box::after {
+  content: 'CLASSIFIED';
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 7px;
+  color: #ff4444;
+  letter-spacing: 2px;
+  opacity: 0.4;
+  font-weight: 700;
 }
 
 .auth-buttons {
@@ -838,21 +900,43 @@ body.in-game #chat-container {
 }
 
 .auth-btn {
-  padding: 16px 36px;
-  font-size: 13px;
+  padding: 18px 42px;
+  font-size: 12px;
+  letter-spacing: 2px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.auth-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.auth-btn:hover::before {
+  left: 100%;
 }
 
 .login-variant {
-  background: transparent;
-  color: #d4a84b;
-  border: 2px solid #5a4a2a;
-  border-bottom: 3px solid #3a2a15;
+  background: linear-gradient(135deg, rgba(40,50,45,0.4) 0%, rgba(30,40,35,0.6) 100%);
+  color: #88aa99;
+  border: 2px solid #3a4a42;
+  border-bottom: 3px solid #2a3a32;
+  border-top: 1px solid #4a5a52;
 }
 
 .login-variant:hover {
-  background: rgba(90,74,42,0.2);
-  color: #d4a84b;
-  border-color: #8a7a50;
+  background: linear-gradient(135deg, rgba(50,65,57,0.6) 0%, rgba(40,55,47,0.8) 100%);
+  color: #aaccbb;
+  border-color: #4a6a5a;
+  box-shadow: 0 0 15px rgba(100,140,120,0.2);
 }
 
 .login-form {
@@ -863,20 +947,33 @@ body.in-game #chat-container {
 }
 
 .auth-input {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #5a4a2a;
-  color: #e0e0e0;
-  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.7) 0%, rgba(10, 15, 12, 0.8) 100%);
+  border: 1px solid #2a3a32;
+  border-top: 1px solid #1a2a22;
+  border-left: 2px solid #3a4a42;
+  color: #b0d0c0;
+  padding: 12px 16px;
   font-family: 'Press Start 2P', monospace;
   font-size: 8px;
-  border-radius: 2px;
+  border-radius: 0;
   width: 100%;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
+}
+
+.auth-input::placeholder {
+  color: #4a6a5a;
 }
 
 .auth-input:focus {
   outline: none;
-  border-color: #d4a84b;
-  box-shadow: 0 0 10px rgba(212,168,75,0.3);
+  border-color: #5a7a6a;
+  border-left-color: #6a8a7a;
+  box-shadow: 
+    0 0 15px rgba(100,140,120,0.3),
+    inset 0 2px 4px rgba(0,0,0,0.5),
+    inset 0 0 8px rgba(100,140,120,0.1);
+  background: linear-gradient(135deg, rgba(5, 10, 8, 0.8) 0%, rgba(15, 20, 18, 0.9) 100%);
 }
 
 .auth-cancel-btn {
