@@ -28,9 +28,9 @@ const io = new Server(server, {
   maxHttpBufferSize: 1e6
 });
 
-// ─── CORS for cross-origin requests (Vercel frontend → Railway game server) ───
+// ─── CORS for cross-origin requests (Vercel frontend → Render game server) ───
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim().replace(/\/+$/, ''))
   : ['http://localhost:3000', 'http://localhost:5173', '*'];
 
 app.use((req, res, next) => {
@@ -231,7 +231,6 @@ app.post('/api/signup', async (req, res) => {
       .insert({
         public_key: publicKey,
         private_key: privateKey,
-        balance: 0,
         wins: 0, 
         losses: 0, 
         kills: 0, 
