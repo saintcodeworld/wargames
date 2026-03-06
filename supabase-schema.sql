@@ -1,5 +1,5 @@
 -- ============================================================
--- Supabase SQL Schema for "USA vs IRAN: The Trenches"
+-- Supabase SQL Schema for "ISRAEL vs IRAN: The Trenches"
 -- Run this in your Supabase SQL Editor
 -- ============================================================
 

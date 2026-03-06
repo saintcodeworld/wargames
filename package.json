@@ -1,7 +1,7 @@
 {
-  "name": "market-warfare-the-trenches",
+  "name": "israel-vs-iran-the-trenches",
   "version": "1.0.0",
-  "description": "Real-time multiplayer 2D side-scrolling trench shooter — Bulls vs Bears",
+  "description": "Real-time multiplayer 2D side-scrolling trench shooter — Israel vs Iran",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

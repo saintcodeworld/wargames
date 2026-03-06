@@ -481,7 +481,7 @@ app.get('/api/chat/recent', async (req, res) => {
 // Admin: Clear all chat messages
 app.post('/api/admin/clear-chat', async (req, res) => {
   const { password } = req.body;
-  if (password !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+  if (password !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
@@ -545,8 +545,8 @@ function createRoom(roomId, creatorId, mode, entryFee) {
     id: roomId,
     players: {},
     bullets: [],
-    scores: { usa: 0, iran: 0 },
-    roundScores: { usa: 0, iran: 0 }, // Track round wins
+    scores: { israel: 0, iran: 0 },
+    roundScores: { israel: 0, iran: 0 }, // Track round wins
     lastTick: Date.now(),
     status: 'waiting',  // waiting, countdown, active, round_end
     createdAt: Date.now(),
@@ -592,19 +592,19 @@ function getRoom(roomId) {
 }
 
 function assignTeam(room) {
-  let usa = 0, iran = 0;
+  let israel = 0, iran = 0;
   for (const pid in room.players) {
-    if (room.players[pid].team === 'usa') usa++;
+    if (room.players[pid].team === 'israel') israel++;
     else iran++;
   }
 
   // For 2v2, ensure each team has max 2 players
   if (room.mode === '2v2') {
-    if (usa >= 2) return 'iran';
-    if (iran >= 2) return 'usa';
+    if (israel >= 2) return 'iran';
+    if (iran >= 2) return 'israel';
   }
 
-  return usa <= iran ? 'usa' : 'iran';
+  return israel <= iran ? 'israel' : 'iran';
 }
 
 function isInTrench(x) {
@@ -613,7 +613,7 @@ function isInTrench(x) {
 }
 
 function spawnPosition(team) {
-  if (team === 'usa') {
+  if (team === 'israel') {
     return { x: 100 + Math.random() * 200, y: GROUND_Y - PLAYER_H };
   } else {
     return { x: 1300 + Math.random() * 200, y: GROUND_Y - PLAYER_H };
@@ -634,7 +634,7 @@ function createPlayer(id, team) {
     crouching: false,
     jumping: false,
     onGround: true,
-    facing: team === 'usa' ? 1 : -1,
+    facing: team === 'israel' ? 1 : -1,
     inputs: { left: false, right: false, up: false, down: false },
     inputSeq: 0,
     lastShot: 0,
@@ -749,7 +749,7 @@ function tickRoom(room) {
           p.hp = 0;
           p.alive = false;
           p.respawnAt = now + RESPAWN_TIME;
-          if (b.team === 'usa') room.scores.usa++;
+          if (b.team === 'israel') room.scores.israel++;
           else room.scores.iran++;
 
           // Update account stats for killer
@@ -801,25 +801,25 @@ function tickRoom(room) {
 
   // Check for team elimination
   if (room.status === 'active') {
-    let usaAlive = false;
+    let israelAlive = false;
     let iranAlive = false;
 
     for (const pid in room.players) {
       const p = room.players[pid];
       if (p.alive) {
-        if (p.team === 'usa') usaAlive = true;
+        if (p.team === 'israel') israelAlive = true;
         else iranAlive = true;
       }
     }
 
     // If one team is eliminated
-    if (!usaAlive || !iranAlive) {
+    if (!israelAlive || !iranAlive) {
       room.status = 'round_end';
       room.roundEndTime = Date.now();
 
       // Update round scores
-      if (!usaAlive) room.roundScores.iran++;
-      else room.roundScores.usa++;
+      if (!israelAlive) room.roundScores.iran++;
+      else room.roundScores.israel++;
 
       // Check for match winner
       const winner = checkMatchWinner(room);
@@ -897,7 +897,7 @@ function tickRoom(room) {
         }, 5000);
       } else {
         io.to(room.id).emit('round_end', {
-          roundWinner: !usaAlive ? 'iran' : 'usa',
+          roundWinner: !israelAlive ? 'iran' : 'israel',
           roundScores: room.roundScores,
           currentRound: room.currentRound
         });
@@ -914,7 +914,7 @@ function tickRoom(room) {
 }
 
 function checkMatchWinner(room) {
-  if (room.roundScores.usa >= 2) return 'usa';
+  if (room.roundScores.israel >= 2) return 'israel';
   if (room.roundScores.iran >= 2) return 'iran';
   return null;
 }
@@ -941,7 +941,7 @@ function startNewRound(room) {
 }
 
 function resetRoom(room) {
-  room.roundScores = { usa: 0, iran: 0 };
+  room.roundScores = { israel: 0, iran: 0 };
   room.currentRound = 1;
   room.bullets = [];
   

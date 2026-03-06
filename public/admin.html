@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Panel — The Trenches</title>
   <link rel="icon" type="image/png" href="/favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Black+Ops+One&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0a0a0a;
-      color: #e0e0e0;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      background: #0d0f12;
+      color: #c8ccd0;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -25,178 +26,221 @@
 
     h1 {
       text-align: center;
-      color: #ff4444;
-      font-size: 1.8rem;
-      margin-bottom: 8px;
-      letter-spacing: 1px;
+      color: #e8a317;
+      font-size: 1.6rem;
+      margin-bottom: 6px;
+      letter-spacing: 6px;
+      font-family: 'Black Ops One', monospace;
+      text-transform: uppercase;
     }
     .subtitle {
       text-align: center;
-      color: #666;
-      font-size: 0.85rem;
-      margin-bottom: 30px;
+      color: #6b7280;
+      font-size: 0.8rem;
+      margin-bottom: 28px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
     }
 
     .card {
-      background: #141414;
-      border: 1px solid #222;
-      border-radius: 12px;
-      padding: 28px;
-      margin-bottom: 20px;
+      background: #13161a;
+      border: 1px solid #2a2d32;
+      border-top: 1px solid #d4910a;
+      border-radius: 0;
+      padding: 24px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .card::before {
+      content: '⊕';
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      font-size: 10px;
+      color: #4a4d52;
+      pointer-events: none;
+    }
+    .card::after {
+      content: '⊕';
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      font-size: 10px;
+      color: #4a4d52;
+      pointer-events: none;
     }
 
     .card h2 {
-      font-size: 1.1rem;
-      color: #ccc;
-      margin-bottom: 16px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #222;
+      font-size: 1rem;
+      color: #e8a317;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #2a2d32;
+      font-family: 'Black Ops One', monospace;
+      letter-spacing: 3px;
+      text-transform: uppercase;
     }
 
     label {
       display: block;
-      font-size: 0.8rem;
-      color: #888;
-      margin-bottom: 6px;
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-bottom: 4px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 2px;
+      font-family: 'Share Tech Mono', monospace;
     }
 
     input[type="password"],
     input[type="text"],
     input[type="number"] {
       width: 100%;
-      padding: 12px 14px;
-      background: #0d0d0d;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 0.95rem;
+      padding: 10px 12px;
+      background: #0d0f12;
+      border: 1px solid #2a2d32;
+      border-radius: 0;
+      color: #c8ccd0;
+      font-size: 0.9rem;
+      font-family: 'Share Tech Mono', monospace;
       outline: none;
-      transition: border-color 0.2s;
-      margin-bottom: 14px;
+      transition: border-color 0.15s;
+      margin-bottom: 12px;
     }
     input:focus {
-      border-color: #ff4444;
+      border-color: #d4910a;
     }
 
     button {
       width: 100%;
-      padding: 12px;
-      background: #ff4444;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 600;
+      padding: 10px;
+      background: #d4910a;
+      color: #0d0f12;
+      border: 1px solid #d4910a;
+      border-radius: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+      transition: background 0.15s;
     }
-    button:hover { background: #cc3333; }
-    button:active { transform: scale(0.98); }
+    button:hover { background: #e8a317; }
+    button:active { transform: none; }
     button:disabled {
-      background: #333;
-      color: #666;
+      background: #2a2d32;
+      color: #4a4d52;
+      border-color: #2a2d32;
       cursor: not-allowed;
     }
 
     .msg {
-      margin-top: 12px;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 0;
+      font-size: 0.8rem;
       display: none;
+      font-family: 'Share Tech Mono', monospace;
     }
     .msg.success {
       display: block;
-      background: #0d2818;
-      border: 1px solid #1a5c2e;
-      color: #4ade80;
+      background: rgba(46,204,113,0.08);
+      border: 1px solid #2ecc71;
+      color: #2ecc71;
     }
     .msg.error {
       display: block;
-      background: #2a0a0a;
-      border: 1px solid #5c1a1a;
-      color: #f87171;
+      background: rgba(192,57,43,0.08);
+      border: 1px solid #c0392b;
+      color: #c0392b;
     }
 
     .user-result {
-      background: #0d0d0d;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 10px;
+      background: #0d0f12;
+      border: 1px solid #2a2d32;
+      border-left: 2px solid #6b7280;
+      border-radius: 0;
+      padding: 12px;
+      margin-bottom: 8px;
       cursor: pointer;
-      transition: border-color 0.2s;
+      transition: border-color 0.15s;
     }
     .user-result:hover {
-      border-color: #ff4444;
+      border-color: #d4910a;
+      border-left-color: #d4910a;
     }
     .user-result .pk {
-      font-family: monospace;
+      font-family: 'Share Tech Mono', monospace;
       font-size: 0.8rem;
-      color: #aaa;
+      color: #9ca3af;
       word-break: break-all;
     }
     .user-result .stats {
       display: flex;
-      gap: 16px;
-      margin-top: 8px;
+      gap: 14px;
+      margin-top: 6px;
       font-size: 0.8rem;
-      color: #666;
+      color: #6b7280;
+      font-family: 'Share Tech Mono', monospace;
     }
     .user-result .stats span {
-      color: #aaa;
+      color: #9ca3af;
     }
     .user-result .balance-tag {
       display: inline-block;
       margin-top: 6px;
-      padding: 3px 10px;
-      background: #1a2a1a;
-      border-radius: 4px;
-      color: #4ade80;
-      font-size: 0.85rem;
-      font-weight: 600;
+      padding: 2px 8px;
+      background: rgba(46,204,113,0.08);
+      border: 1px solid #2ecc71;
+      border-radius: 0;
+      color: #2ecc71;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: 'Share Tech Mono', monospace;
     }
 
     .hidden { display: none !important; }
 
     .search-results {
-      margin-top: 14px;
+      margin-top: 12px;
       max-height: 350px;
       overflow-y: auto;
     }
+    .search-results::-webkit-scrollbar { width: 3px; }
+    .search-results::-webkit-scrollbar-track { background: #0d0f12; }
+    .search-results::-webkit-scrollbar-thumb { background: #3a3d42; border-radius: 0; }
 
     .selected-user {
-      background: #1a1a2a;
-      border: 1px solid #4444ff;
-      border-radius: 8px;
-      padding: 12px 14px;
-      margin-bottom: 14px;
-      font-family: monospace;
+      background: #0d0f12;
+      border: 1px solid #9945FF;
+      border-radius: 0;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-family: 'Share Tech Mono', monospace;
       font-size: 0.8rem;
       word-break: break-all;
-      color: #88aaff;
+      color: #b366ff;
     }
     .selected-user .label {
-      font-family: 'Segoe UI', sans-serif;
-      font-size: 0.75rem;
-      color: #666;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.7rem;
+      color: #6b7280;
       text-transform: uppercase;
+      letter-spacing: 2px;
       margin-bottom: 4px;
     }
 
     .logout-btn {
       background: transparent;
-      border: 1px solid #333;
-      color: #666;
+      border: 1px solid #2a2d32;
+      color: #6b7280;
       font-size: 0.8rem;
       padding: 8px;
       margin-top: 10px;
     }
     .logout-btn:hover {
-      border-color: #ff4444;
-      color: #ff4444;
+      border-color: #c0392b;
+      color: #c0392b;
       background: transparent;
     }
   </style>
@@ -246,8 +290,8 @@
       <!-- Clear Chat -->
       <div class="card">
         <h2>🧹 Clear Chat Messages</h2>
-        <p style="font-size:0.85rem;color:#888;margin-bottom:14px;">Delete all chat messages from the lobby. This cannot be undone.</p>
-        <button onclick="clearChat()" style="background:#cc8800;">Clear All Chat</button>
+        <p style="font-size:0.85rem;color:#6b7280;margin-bottom:14px;">Delete all chat messages from the lobby. This cannot be undone.</p>
+        <button onclick="clearChat()" style="background:#c0392b;border-color:#c0392b;color:#fff;">Clear All Chat</button>
         <div id="clearChatMsg" class="msg"></div>
       </div>
 

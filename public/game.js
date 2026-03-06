@@ -1,4 +1,4 @@
-// ─── USA vs IRAN: The Trenches — Client ───
+// ─── ISRAEL vs IRAN: The Trenches — Client ───
 (function () {
   'use strict';
 
@@ -471,7 +471,7 @@
   const countdownOverlay = document.getElementById('countdown-overlay');
   const countdownNumber = document.getElementById('countdown-number');
   const scoreboard = document.getElementById('scoreboard');
-  const scoreUsa = document.getElementById('score-usa');
+  const scoreIsrael = document.getElementById('score-israel');
   const scoreIran = document.getElementById('score-iran');
   const hud = document.getElementById('hud');
   const teamBadge = document.getElementById('team-badge');
@@ -485,7 +485,7 @@
   // ─── Game state ───
   let myId = null;
   let myTeam = null;
-  let serverState = { players: {}, bullets: [], scores: { usa: 0, iran: 0 } };
+  let serverState = { players: {}, bullets: [], scores: { israel: 0, iran: 0 } };
   let config = {};
   let joined = false;
 
@@ -821,7 +821,7 @@
   socket.on('round_end', (data) => {
     roundTimerOverlay.style.display = 'flex';
     roundWinnerEl.textContent = `${data.roundWinner.toUpperCase()} WIN ROUND ${data.currentRound}`;
-    roundScoresEl.textContent = `USA ${data.roundScores.usa} — ${data.roundScores.iran} IRAN`;
+    roundScoresEl.textContent = `ISRAEL ${data.roundScores.israel} — ${data.roundScores.iran} IRAN`;
     
     let timeLeft = 2;
     roundTimerNumber.textContent = timeLeft;
@@ -886,7 +886,7 @@
     myTeam = null;
     localPlayer = null;
     predictedPlayer = null;
-    serverState = { players: {}, bullets: [], scores: { usa: 0, iran: 0 } };
+    serverState = { players: {}, bullets: [], scores: { israel: 0, iran: 0 } };
     inputs = { left: false, right: false, up: false, down: false };
     pendingInputs = [];
     currentPrizePool = 0;
@@ -1022,7 +1022,7 @@
 
     // Team badge
     teamBadge.textContent = myTeam.toUpperCase();
-    teamBadge.className = 'team-badge ' + (myTeam === 'usa' ? 'badge-usa' : 'badge-iran');
+    teamBadge.className = 'team-badge ' + (myTeam === 'israel' ? 'badge-israel' : 'badge-iran');
 
     resizeCanvas();
   });
@@ -1151,7 +1151,7 @@
     const now = performance.now();
 
     // Update scores
-    scoreUsa.textContent = state.scores.usa;
+    scoreIsrael.textContent = state.scores.israel;
     scoreIran.textContent = state.scores.iran;
 
     // Update HUD
@@ -1243,17 +1243,17 @@
           vx: (Math.random() - 0.5) * 6,
           vy: (Math.random() - 0.5) * 6 - 3,
           life: 1.0,
-          color: victim.team === 'usa' ? '#3b82f6' : '#ef4444'
+          color: victim.team === 'israel' ? '#0078d4' : '#ef4444'
         });
       }
     }
 
     // Kill feed
-    const killerTeam = serverState.players[data.killerId]?.team || 'usa';
+    const killerTeam = serverState.players[data.killerId]?.team || 'israel';
     const msg = document.createElement('div');
     msg.className = 'kill-msg';
-    const kColor = killerTeam === 'usa' ? '#3b82f6' : '#ef4444';
-    const vColor = data.playerId === myId ? '#fff' : (victim?.team === 'usa' ? '#3b82f6' : '#ef4444');
+    const kColor = killerTeam === 'israel' ? '#0078d4' : '#ef4444';
+    const vColor = data.playerId === myId ? '#fff' : (victim?.team === 'israel' ? '#0078d4' : '#ef4444');
     const killerId = data.killerId === myId ? 'YOU' : data.killerId.slice(0, 6);
     const victimId = data.playerId === myId ? 'YOU' : data.playerId.slice(0, 6);
     msg.innerHTML = `<span style="color:${kColor}">${killerId}</span> ► <span style="color:${vColor}">${victimId}</span>`;
@@ -1264,42 +1264,155 @@
   // ─── Rendering ───
   const GRASS_COLORS = ['#3a8c3a', '#2d7a2d', '#45a045', '#339933'];
 
+  // Persistent environmental particles (smoke, embers, dust)
+  let envParticles = [];
+  let envParticlesInit = false;
+
+  function initEnvParticles(w, h) {
+    envParticles = [];
+    // Smoke wisps
+    for (let i = 0; i < 20; i++) {
+      envParticles.push({
+        type: 'smoke',
+        x: Math.random() * w * 3,
+        y: h * 0.1 + Math.random() * h * 0.4,
+        size: 30 + Math.random() * 60,
+        alpha: 0.03 + Math.random() * 0.06,
+        speed: 0.15 + Math.random() * 0.3,
+        drift: (Math.random() - 0.5) * 0.05
+      });
+    }
+    // Embers / sparks floating up
+    for (let i = 0; i < 15; i++) {
+      envParticles.push({
+        type: 'ember',
+        x: Math.random() * w * 3,
+        y: h * 0.3 + Math.random() * h * 0.5,
+        size: 1 + Math.random() * 2,
+        alpha: 0.4 + Math.random() * 0.5,
+        speed: 0.2 + Math.random() * 0.4,
+        rise: 0.1 + Math.random() * 0.3,
+        flicker: Math.random() * Math.PI * 2
+      });
+    }
+    // Dust motes in the air
+    for (let i = 0; i < 25; i++) {
+      envParticles.push({
+        type: 'dust',
+        x: Math.random() * w * 3,
+        y: h * 0.2 + Math.random() * h * 0.6,
+        size: 1 + Math.random() * 1.5,
+        alpha: 0.1 + Math.random() * 0.15,
+        speed: 0.05 + Math.random() * 0.15,
+        wobble: Math.random() * Math.PI * 2
+      });
+    }
+    envParticlesInit = true;
+  }
+
   function drawSky(w, h) {
-    // Gradient sky matching the image — hazy blue
+    if (!envParticlesInit) initEnvParticles(w, h);
+
+    // War-torn sky — dark grey/orange haze from fires and smoke
     const grad = ctx.createLinearGradient(0, 0, 0, h * 0.55);
-    grad.addColorStop(0, '#5b7ea8');
-    grad.addColorStop(0.5, '#7a9dbd');
-    grad.addColorStop(1, '#8aaa8a');
+    grad.addColorStop(0, '#2c3040');
+    grad.addColorStop(0.3, '#4a4050');
+    grad.addColorStop(0.55, '#6b5a48');
+    grad.addColorStop(0.8, '#8a6a40');
+    grad.addColorStop(1, '#5a5040');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h * 0.55);
+
+    // Distant fire glow on the horizon
+    ctx.globalAlpha = 0.12;
+    const fireGrad = ctx.createRadialGradient(w * 0.2, h * 0.5, 10, w * 0.2, h * 0.5, 180);
+    fireGrad.addColorStop(0, '#ff6a00');
+    fireGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = fireGrad;
+    ctx.fillRect(0, 0, w, h * 0.55);
+
+    const fireGrad2 = ctx.createRadialGradient(w * 0.75, h * 0.48, 10, w * 0.75, h * 0.48, 140);
+    fireGrad2.addColorStop(0, '#ff4400');
+    fireGrad2.addColorStop(1, 'transparent');
+    ctx.fillStyle = fireGrad2;
+    ctx.fillRect(0, 0, w, h * 0.55);
+    ctx.globalAlpha = 1.0;
+
+    // Smoke clouds drifting across sky
+    const now = performance.now() * 0.001;
+    for (const p of envParticles) {
+      if (p.type === 'smoke') {
+        const sx = (p.x - camera.x * 0.1 + now * p.speed * 60) % (w + p.size * 2) - p.size;
+        const sy = p.y + Math.sin(now * 0.5 + p.x) * 8;
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = '#3a3530';
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, p.size, p.size * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1.0;
   }
 
   function drawGrass(w, h, groundScreenY) {
-    // Vibrant green grass below the battlefield
+    // War-torn muddy ground below the battlefield
     const grassTop = groundScreenY + 30;
     const grad = ctx.createLinearGradient(0, grassTop, 0, h);
-    grad.addColorStop(0, '#3d8b3d');
-    grad.addColorStop(1, '#2a6e2a');
+    grad.addColorStop(0, '#4a3d2a');
+    grad.addColorStop(0.4, '#3d3325');
+    grad.addColorStop(1, '#2a2418');
     ctx.fillStyle = grad;
     ctx.fillRect(0, grassTop, w, h - grassTop);
 
-    // Mower lines
-    ctx.globalAlpha = 0.15;
-    for (let y = grassTop; y < h; y += 12) {
-      ctx.fillStyle = y % 24 < 12 ? '#4aa04a' : '#2d7a2d';
-      ctx.fillRect(0, y, w, 6);
+    // Mud texture — horizontal streaks
+    ctx.globalAlpha = 0.12;
+    for (let y = grassTop; y < h; y += 8) {
+      ctx.fillStyle = y % 16 < 8 ? '#5a4a35' : '#3a3020';
+      ctx.fillRect(0, y, w, 4);
     }
     ctx.globalAlpha = 1.0;
 
-    // Diagonal mower pattern
-    ctx.globalAlpha = 0.06;
-    ctx.strokeStyle = '#5ab85a';
-    ctx.lineWidth = 2;
-    for (let x = -h; x < w + h; x += 20) {
+    // Shell craters in the mud
+    const craterSeed = [0.15, 0.35, 0.55, 0.72, 0.88];
+    for (let i = 0; i < craterSeed.length; i++) {
+      const cx = (craterSeed[i] * w * 3 - camera.x * 0.5) % (w + 100) - 50;
+      const cy = grassTop + 15 + (i % 3) * 20;
+      const cr = 12 + (i % 3) * 8;
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = '#1a1610';
       ctx.beginPath();
-      ctx.moveTo(x, grassTop);
-      ctx.lineTo(x + (h - grassTop), h);
+      ctx.ellipse(cx, cy, cr, cr * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Crater rim
+      ctx.globalAlpha = 0.15;
+      ctx.strokeStyle = '#5a4a30';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, cr + 3, cr * 0.4 + 2, 0, 0, Math.PI * 2);
       ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Scattered debris — small rocks and rubble
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#6a5a40';
+    const debrisSeed = [0.1, 0.22, 0.38, 0.47, 0.62, 0.78, 0.91];
+    for (let i = 0; i < debrisSeed.length; i++) {
+      const dx = (debrisSeed[i] * w * 2 - camera.x * 0.3) % (w + 40) - 20;
+      const dy = grassTop + 8 + (i * 17) % 40;
+      ctx.fillRect(dx, dy, 3 + (i % 3) * 2, 2 + (i % 2));
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Sparse dead grass patches
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#5a6a3a';
+    for (let x = 0; x < w; x += 30) {
+      if (Math.sin(x * 0.7) > 0.3) {
+        const gh = 3 + Math.sin(x * 0.3) * 2;
+        ctx.fillRect(x, grassTop - gh, 2, gh);
+        ctx.fillRect(x + 4, grassTop - gh + 1, 2, gh - 1);
+      }
     }
     ctx.globalAlpha = 1.0;
   }
@@ -1367,21 +1480,48 @@
   }
 
   function drawGround(w, groundScreenY) {
-    // Main ground strip
+    // Main ground strip — scorched muddy no-man's land
     const grad = ctx.createLinearGradient(0, groundScreenY - 30, 0, groundScreenY + 35);
-    grad.addColorStop(0, '#4a8a4a');
-    grad.addColorStop(0.3, '#3d7a3d');
-    grad.addColorStop(0.5, '#6b4a2a');
-    grad.addColorStop(1, '#5a3d20');
+    grad.addColorStop(0, '#5a4a30');
+    grad.addColorStop(0.3, '#4a3a25');
+    grad.addColorStop(0.5, '#3d2d1a');
+    grad.addColorStop(1, '#2a2010');
     ctx.fillStyle = grad;
     ctx.fillRect(0, groundScreenY - 30, w, 65);
 
-    // Grass tufts on top
-    ctx.fillStyle = '#4a9a4a';
-    for (let x = 0; x < w; x += 8) {
-      const h = 3 + Math.sin(x * 0.3) * 2;
-      ctx.fillRect(x, groundScreenY - 30 - h, 3, h);
+    // Scorched patches
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#1a1510';
+    for (let x = 0; x < w; x += 80) {
+      const px = x + Math.sin(x * 0.1) * 20;
+      ctx.beginPath();
+      ctx.ellipse(px, groundScreenY, 20 + Math.sin(x) * 10, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
+    ctx.globalAlpha = 1.0;
+
+    // Sparse dead grass tufts (not lush — war-torn)
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#5a5a30';
+    for (let x = 0; x < w; x += 18) {
+      if (Math.sin(x * 0.5) > 0.2) {
+        const h = 2 + Math.sin(x * 0.3) * 1.5;
+        ctx.fillRect(x, groundScreenY - 30 - h, 2, h);
+      }
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Tire tracks / boot prints crossing the field
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = '#2a2015';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, groundScreenY + 5);
+    for (let x = 0; x < w; x += 10) {
+      ctx.lineTo(x, groundScreenY + 5 + Math.sin(x * 0.05) * 3);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
   }
 
   function drawBarbedWire(groundScreenY) {
@@ -1436,12 +1576,12 @@
 
     if (!p.alive) return;
 
-    const isUSA = p.team === 'usa';
-    // USA: Navy blue uniform with white/red accents
+    const isIsrael = p.team === 'israel';
+    // Israel: White and blue IDF uniform
     // Iran: Dark green uniform with white/red accents
-    const baseColor = isUSA ? '#1e3a5f' : '#1a5c2a';
-    const darkColor = isUSA ? '#0f2440' : '#0e3d1a';
-    const lightColor = isUSA ? '#3b82f6' : '#22c55e';
+    const baseColor = isIsrael ? '#e8edf2' : '#1a5c2a';
+    const darkColor = isIsrael ? '#b0c4de' : '#0e3d1a';
+    const lightColor = isIsrael ? '#4da6ff' : '#22c55e';
     const skinColor = '#d4a574';
 
     // Shadow
@@ -1483,13 +1623,13 @@
     ctx.fillRect(px + 17, torsoTop + 4, 6, 5);
 
     // Flag accent stripes on shoulders
-    if (isUSA) {
-      // USA: red, white, blue stripes
-      ctx.fillStyle = '#dc2626';
+    if (isIsrael) {
+      // Israel: blue and white stripes (Star of David colors)
+      ctx.fillStyle = '#2563eb';
       ctx.fillRect(px + 3, torsoTop, 2, torsoH);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(px + 5, torsoTop, 1, torsoH);
-      ctx.fillStyle = '#dc2626';
+      ctx.fillStyle = '#2563eb';
       ctx.fillRect(px + 25, torsoTop, 2, torsoH);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(px + 24, torsoTop, 1, torsoH);
@@ -1535,7 +1675,7 @@
     ctx.fillRect(px + 8, headY, 14, 12);
 
     // Helmet
-    ctx.fillStyle = isUSA ? '#0f2440' : '#0e3d1a';
+    ctx.fillStyle = isIsrael ? '#2563eb' : '#0e3d1a';
     ctx.fillRect(px + 6, headY - 3, 18, 7);
     ctx.fillRect(px + 8, headY - 5, 14, 5);
 
@@ -1549,13 +1689,13 @@
 
     // Highlight if it's me
     if (p.id === myId) {
-      ctx.strokeStyle = isUSA ? 'rgba(59,130,246,0.5)' : 'rgba(239,68,68,0.5)';
+      ctx.strokeStyle = isIsrael ? 'rgba(37,99,235,0.5)' : 'rgba(239,68,68,0.5)';
       ctx.lineWidth = 1;
       ctx.strokeRect(px - 2, headY - 6, config.playerW + 4, pH + 8);
 
       // Name tag
-      ctx.fillStyle = isUSA ? '#3b82f6' : '#ef4444';
-      ctx.font = '8px "Press Start 2P"';
+      ctx.fillStyle = isIsrael ? '#60a5fa' : '#ef4444';
+      ctx.font = '8px "Inter"';
       ctx.textAlign = 'center';
       ctx.fillText('YOU', px + config.playerW / 2, headY - 10);
     }
@@ -1572,8 +1712,8 @@
       ctx.fillRect(barX, barY, barW * (p.hp / 100), barH);
 
       // Name tag for others
-      ctx.fillStyle = isUSA ? '#3b82f6' : '#ef4444';
-      ctx.font = '6px "Press Start 2P"';
+      ctx.fillStyle = isIsrael ? '#60a5fa' : '#ef4444';
+      ctx.font = '6px "Inter"';
       ctx.textAlign = 'center';
       ctx.fillText(p.id.slice(0, 6), px + config.playerW / 2, barY - 4);
       ctx.textAlign = 'left';
@@ -1583,16 +1723,16 @@
   function drawBullets() {
     for (const b of serverState.bullets) {
       const bx = b.x - camera.x;
-      ctx.fillStyle = b.team === 'usa' ? '#93c5fd' : '#fca5a5';
-      ctx.shadowColor = b.team === 'usa' ? '#3b82f6' : '#ef4444';
+      ctx.fillStyle = b.team === 'israel' ? '#93c5fd' : '#fca5a5';
+      ctx.shadowColor = b.team === 'israel' ? '#2563eb' : '#ef4444';
       ctx.shadowBlur = 6;
       ctx.fillRect(bx - 4, b.y - 1, 8, 3);
       ctx.shadowBlur = 0;
 
       // Trail
       ctx.globalAlpha = 0.3;
-      ctx.fillStyle = b.team === 'usa' ? '#3b82f6' : '#ef4444';
-      const trailDir = b.team === 'usa' ? -1 : 1;
+      ctx.fillStyle = b.team === 'israel' ? '#60a5fa' : '#ef4444';
+      const trailDir = b.team === 'israel' ? -1 : 1;
       ctx.fillRect(bx + trailDir * 8, b.y, 12, 1);
       ctx.globalAlpha = 1.0;
     }
@@ -1742,6 +1882,27 @@
     avgLatency = _latencySamples.reduce((a, b) => a + b, 0) / _latencySamples.length;
   });
 
+  function drawEnvParticles(w, h) {
+    const now = performance.now() * 0.001;
+    for (const p of envParticles) {
+      if (p.type === 'ember') {
+        const ex = (p.x - camera.x * 0.2 + now * p.speed * 40) % (w + 20) - 10;
+        const ey = p.y - (now * p.rise * 30) % (h * 0.5);
+        const flicker = 0.5 + 0.5 * Math.sin(now * 8 + p.flicker);
+        ctx.globalAlpha = p.alpha * flicker;
+        ctx.fillStyle = flicker > 0.6 ? '#ffaa33' : '#ff6600';
+        ctx.fillRect(ex, ey, p.size, p.size);
+      } else if (p.type === 'dust') {
+        const dx = (p.x - camera.x * 0.15 + now * p.speed * 20) % (w + 10) - 5;
+        const dy = p.y + Math.sin(now * 0.8 + p.wobble) * 12;
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = '#8a7a60';
+        ctx.fillRect(dx, dy, p.size, p.size);
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
+
   // ─── Main Game Loop ───
   function gameLoop(now) {
     if (!joined) return;
@@ -1800,6 +1961,9 @@
     drawHitMarkers();
     updateDeathParticles();
 
+    // Atmospheric particles (embers, dust)
+    drawEnvParticles(scaledW, scaledH);
+
     ctx.restore();
 
     requestAnimationFrame(gameLoop);
@@ -1818,5 +1982,25 @@
 
   // Initialize lobby UI (show chat, hide controls)
   showLobbyUI();
+
+  // ─── Contract Address Copy to Clipboard ───
+  const copyContractBtn = document.getElementById('copy-contract-btn');
+  const contractAddress = document.getElementById('contract-address');
+  
+  if (copyContractBtn && contractAddress) {
+    copyContractBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(contractAddress.textContent);
+        copyContractBtn.classList.add('copied');
+        
+        // Reset button state after 2 seconds
+        setTimeout(() => {
+          copyContractBtn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+  }
 
 })();
